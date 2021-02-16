@@ -1,0 +1,10 @@
+site_name: napari-bb-annotations
+site_description: Bounding box annotations
+site_author: Pranathi Vemuri
+
+theme: readthedocs
+
+repo_url: https://github.com/pranathivemuri/napari-bb-annotations
+
+pages:
+- Home: index.md
