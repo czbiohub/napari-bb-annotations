@@ -1,14 +1,11 @@
 import napari
 import os
 import imageio
-import tempfile
-import shutil
 import numpy as np
 import logging
 import skimage.color
-from skimage.io import imread, imsave, ImageCollection
+from skimage.io import imread, imsave, ImageCollection, collection
 import datetime
-from magicgui.widgets import ComboBox
 from gui import connect_to_viewer
 from PIL import ImageDraw
 
@@ -87,13 +84,6 @@ def save_annotations_w_image(
         save_bb_labels_path, "{}_preds_val.csv".format(filename_wo_format)))
 
 
-def remove_tmp_dir(tempdir):
-    try:
-        shutil.rmtree(tempdir, ignore_errors=True)
-    except OSError:
-        pass
-
-
 def get_bbox_obj_detection(bbox):
     """
     Get the coordinates of the 4 corners of a
@@ -134,10 +124,9 @@ def launch_viewer():
     with napari.gui_qt():
         viewer = napari.Viewer()
         path, format_of_files, box_annotations = connect_to_viewer(viewer)
-        label_menu = ComboBox(label='text label', choices=box_annotations)
 
         if format_of_files not in IMAGE_FORMATS:
-            location = tempfile.mkdtemp(prefix='bb_annotations_')
+            location = os.path.dirname(path)
             index = 0
             subprocess.check_call(
                 'ffmpeg -i "{}" -f image2 "{}/video-frame%05d.jpg"'.format(
@@ -145,16 +134,19 @@ def launch_viewer():
             image_collection = ImageCollection(
                 location + os.sep + "*.png",
                 load_func=imread_convert)
+            stack = skimage.io.collection.concatenate_images(image_collection)
         else:
             image_collection = ImageCollection(
                 path + os.sep + "*" + format_of_files,
                 load_func=imread_convert)
+            stack = skimage.io.collection.concatenate_images(image_collection)
+        logger.info("stack shape is {}".format(stack.shape))
         current_file = 0
         if len(image_collection) == 0:
             logger.error("Exiting, no files left to annotate")
 
         add_image_shape_to_viewer(
-            viewer, image_collection[current_file], box_annotations
+            viewer, stack[current_file], box_annotations
         )
         if len(image_collection) == current_file:
             logger.error("Exiting, no files left to annotate")
@@ -173,7 +165,6 @@ def launch_viewer():
                 )
             except IndexError:
                 logger.error("Exiting, no more files left to annotate")
-                remove_tmp_dir(location)
                 sys.exit(1)
             logger.info(
                 "Pressed next key {}".format(current_file))
@@ -192,7 +183,6 @@ def launch_viewer():
                 )
             except IndexError:
                 logger.error("Exiting, no more files left to annotate")
-                remove_tmp_dir(location)
                 sys.exit(1)
             logger.info(
                 "Pressed previous key{}".format(current_file)
@@ -200,6 +190,7 @@ def launch_viewer():
 
         @viewer.bind_key("s")
         def save_annotations(viewer):
+            # TODO load frame here for both image and shapes here instead?
             image = viewer.layers["image"]
             shape = viewer.layers["shape"]
             nonlocal current_file
@@ -212,43 +203,6 @@ def launch_viewer():
                 os.path.join(dirname, save_overlay_dir),
                 all_files[current_file],
             )
-
-        @viewer.bind_key("u")
-        def update_annotations(viewer):
-            label_property = text_property = "box_label"
-            text_color = 'black'
-            size = 10
-            shapes_layer = viewer.layers['shape']
-
-            def update_label_menu(event):
-                """This is a callback function that updates the label menu when
-                the current properties of the Shapes layer change
-                """
-                new_label = str(shapes_layer.current_properties[label_property][0])
-                if new_label != label_menu.value:
-                    label_menu.value = new_label
-
-            shapes_layer.events.current_properties.connect(update_label_menu)
-
-            def label_changed(event):
-                """This is acallback that update the current properties on the Shapes layer
-                when the label menu selection changes
-                """
-                selected_label = event.value
-                current_properties = shapes_layer.current_properties
-                current_properties[label_property] = np.asarray([selected_label])
-                shapes_layer.current_properties = current_properties
-
-            label_menu.changed.connect(label_changed)
-
-            # To fix bug in currently have for creating emtpy layers with text
-            # see: https://github.com/napari/napari/issues/2115
-            def on_data(event):
-                if viewer.layers['shape'].text.mode == 'none':
-                    viewer.layers['shape'].text = text_property
-                    viewer.layers['shape'].text.color = text_color
-                    viewer.layers['shape'].text.size = size
-            viewer.layers['shape'].events.set_data.connect(on_data)
 
 
 def main():
