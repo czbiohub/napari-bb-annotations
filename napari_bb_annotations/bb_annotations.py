@@ -216,8 +216,8 @@ def launch_viewer():
         @viewer.bind_key("u")
         def update_annotations(viewer):
             label_property = text_property = "box_label"
-            text_color = 'green'
-            size = 20
+            text_color = 'black'
+            size = 10
             shapes_layer = viewer.layers['shape']
 
             def update_label_menu(event):
