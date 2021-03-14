@@ -4,8 +4,7 @@ import os
 import numpy as np
 
 
-# create the GUI for selecting the values
-def create_label_menu(shapes_layer, labels):
+def create_label_menu(shapes_layer, label_property, labels):
     """Create a label menu widget that can be added to the napari viewer dock
 
     Parameters:
@@ -23,7 +22,6 @@ def create_label_menu(shapes_layer, labels):
         the container widget with the label combobox
     """
     # Create the label selection menu
-    label_property = text_property = "box_label"
     label_menu = ComboBox(label='text label', choices=labels)
     label_widget = Container(widgets=[label_menu])
 
@@ -51,21 +49,21 @@ def create_label_menu(shapes_layer, labels):
     return label_widget
 
 
-def update_layers(viewer, labels):
-    label_widget = create_label_menu(viewer, box_annotations)
+def update_layers(viewer, box_annotations):
+    shapes_layer = viewer.layers['Shapes']
+
+    label_widget = create_label_menu(shapes_layer, box_annotations)
     label_property = text_property = "box_label"
     text_color = 'black'
     size = 10
-    shapes_layer = viewer.layers['shape']
 
-    # To fix bug in currently have for creating emtpy layers with text
+    # this is a hack to get around a bug we currently have for creating emtpy layers with text
     # see: https://github.com/napari/napari/issues/2115
     def on_data(event):
-        if viewer.layers['shape'].text.mode == 'none':
-            viewer.layers['shape'].text = text_property
-            viewer.layers['shape'].text.color = text_color
-            viewer.layers['shape'].text.size = size
-    viewer.layers['shape'].events.set_data.connect(on_data)
+        if shapes.text.mode == 'none':
+            shapes.text = text_property
+            shapes.text.color = text_color
+    shapes.events.set_data.connect(on_data)
     # add the label selection gui to the viewer as a dock widget
     viewer.window.add_dock_widget(label_widget, area='right')
 
@@ -105,9 +103,7 @@ def connect_to_viewer(viewer):
     if dialog.exec():
         path, format_of_files, box_annotations = dialog.getInputs()
         box_annotations = box_annotations.split(",")
-        assert os.path.exists(
-            os.path.abspath(path)),
-        "Path provided {} doesn't exist, please restart".format(path)
+        assert os.path.exists(os.path.abspath(path))
         update_gui_btn = QPushButton("Update layers, only click once per stack [u]")
         update_gui_btn.clicked.connect(
             lambda: update_layers(viewer, box_annotations))

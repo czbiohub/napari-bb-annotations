@@ -1,6 +1,7 @@
 import datetime
 import logging
 import os
+import re
 import subprocess
 
 import napari
@@ -112,7 +113,7 @@ def add_image_shape_to_viewer(viewer, image, box_annotations):
     logger.info("annotations added are {}".format(box_annotations))
     viewer.add_image(image, name="image")
     shapes = viewer.add_shapes(
-        face_color='black', properties={'box_label': box_annotations}, ndim=3)
+        properties={'box_label': box_annotations}, ndim=3)
 
     shapes.text = 'box_label'
     shapes.opacity = 0.3
@@ -150,9 +151,9 @@ def launch_viewer():
         @viewer.bind_key("s")
         def save_annotations(viewer):
             # TODO load frame here for both image and shapes here instead?
-            shape = viewer.layers["shape"]
+            shape = viewer.layers["Shapes"]
             image = viewer.layers["image"]
-            current_file = shape.z_index
+            current_file = list(map(int, re.findall(r'\d+', viewer.status)))[0]
             save_annotations_w_image(
                 image.data,
                 shape.data,
