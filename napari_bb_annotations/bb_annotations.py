@@ -1,11 +1,13 @@
-import napari
-import os
-import imageio
-import numpy as np
-import logging
-import skimage.color
-from skimage.io import imread, imsave, ImageCollection, collection
 import datetime
+import logging
+import os
+import subprocess
+
+import napari
+import numpy as np
+import pandas as pd
+from skimage.io import imread, ImageCollection, collection
+
 from gui import connect_to_viewer
 from PIL import ImageDraw
 
@@ -37,51 +39,47 @@ LUMI_CSV_COLUMNS = [
 
 def draw_objects(draw, bboxes, labels):
     """Draws the bounding box and label for each object."""
-    for bboxes in bbox:
-        bbox = obj.bbox
+    for index, bbox in enumerate(bboxes):
         draw.rectangle([(bbox.xmin, bbox.ymin), (bbox.xmax, bbox.ymax)],
                        outline='red')
         draw.text((bbox.xmin + 10, bbox.ymin + 10),
-                  '%s\n%.2f' % (labels.get(obj.id, obj.id), obj.score),
+                  '%s' % (labels[index]),
                   fill='red')
 
 
 def save_annotations_w_image(
-    image,
+    stack,
     bboxes,
     labels,
-    save_bb_labels_path,
     save_overlay_path,
     file_path,
 ):
     save_overlay_path = os.path.abspath(save_overlay_path)
-    save_bb_labels_path = os.path.abspath(save_bb_labels_path)
+    df = pd.DataFrame(columns=LUMI_CSV_COLUMNS)
+    for image in stack:
+        # visualization image
+        image = image.convert('RGB')
+        draw_objects(ImageDraw.Draw(image), bboxes, labels)
+        for index, bbox in bboxes:
+            df = df.append(
+                {'image_id': file_path,
+                 'xmin': bbox.xmin,
+                 'xmax': bbox.xmax,
+                 'ymin': bbox.ymin,
+                 'ymax': bbox.ymax,
+                 'label': labels[index]}, ignore_index=True)
 
-    shape = image.shape
-    # visualization image
-    image = image.convert('RGB')
-    draw_objects(ImageDraw.Draw(image), bboxes, labels)
-    for index, bbox in bboxes:
-        df = df.append(
-            {'image_id': file_path,
-             'xmin': bbox.xmin,
-             'xmax': bbox.xmax,
-             'ymin': bbox.ymin,
-             'ymax': bbox.ymax,
-             'label': labels[index]}, ignore_index=True)
+        # save images
+        filename_wo_format = os.path.basename(file_path).split(".")[0]
+        overlaid_save_name = os.path.join(
+            save_overlay_path,
+            "{}_overlaid.png".format(filename_wo_format)
+        )
+        logger.info("saving images to {}".format(overlaid_save_name))
 
-    # save images
-    filename_wo_format = os.path.basename(file_path).split(".")[0]
-    overlaid_save_name = os.path.join(
-        save_overlay_path,
-        "{}_overlaid.png".format(filename_wo_format)
-    )
-    logger.info("saving bboxes to {}".format(label_save_name))
-    logger.info("saving images to {}".format(overlaid_save_name))
-
-    image.save(overlaid_save_name)
-    df.to_csv(os.path.join(
-        save_bb_labels_path, "{}_preds_val.csv".format(filename_wo_format)))
+        image.save(overlaid_save_name)
+        df.to_csv(os.path.join(
+            os.path.dirname(save_overlay_path), "{}_preds_val.csv".format(filename_wo_format)))
 
 
 def get_bbox_obj_detection(bbox):
@@ -114,7 +112,8 @@ def add_image_shape_to_viewer(viewer, image, box_annotations):
     logger.info("annotations added are {}".format(box_annotations))
     viewer.add_image(image, name="image")
     shapes = viewer.add_shapes(
-        properties={'box_label': box_annotations}, name="shape")
+        face_color='black', properties={'box_label': box_annotations}, ndim=3)
+
     shapes.text = 'box_label'
     shapes.opacity = 0.3
     shapes.mode = 'add_rectangle'
@@ -124,83 +123,41 @@ def launch_viewer():
     with napari.gui_qt():
         viewer = napari.Viewer()
         path, format_of_files, box_annotations = connect_to_viewer(viewer)
+        dirname = location = os.path.dirname(path)
+        save_overlay_path = os.path.join(dirname, "overlay_dir"),
 
         if format_of_files not in IMAGE_FORMATS:
-            location = os.path.dirname(path)
-            index = 0
             subprocess.check_call(
                 'ffmpeg -i "{}" -f image2 "{}/video-frame%05d.jpg"'.format(
                     path, location), shell=True)
             image_collection = ImageCollection(
                 location + os.sep + "*.png",
                 load_func=imread_convert)
-            stack = skimage.io.collection.concatenate_images(image_collection)
         else:
             image_collection = ImageCollection(
                 path + os.sep + "*" + format_of_files,
                 load_func=imread_convert)
-            stack = skimage.io.collection.concatenate_images(image_collection)
+        stack = collection.concatenate_images(image_collection)
+        all_files = image_collection.files
         logger.info("stack shape is {}".format(stack.shape))
-        current_file = 0
-        if len(image_collection) == 0:
+        total_files = len(image_collection)
+        if total_files == 0:
             logger.error("Exiting, no files left to annotate")
 
         add_image_shape_to_viewer(
-            viewer, stack[current_file], box_annotations
-        )
-        if len(image_collection) == current_file:
-            logger.error("Exiting, no files left to annotate")
-
-        @viewer.bind_key("Right")
-        def next_image(viewer):
-            # pop off old layers before adding new ones
-            for i in reversed(range(len(viewer.layers))):
-                viewer.layers.pop(i)
-
-            nonlocal current_file
-            current_file += 1
-            try:
-                add_image_shape_to_viewer(
-                    viewer, image_collection[current_file], box_annotations
-                )
-            except IndexError:
-                logger.error("Exiting, no more files left to annotate")
-                sys.exit(1)
-            logger.info(
-                "Pressed next key {}".format(current_file))
-
-        @viewer.bind_key("Left")
-        def previous_image(viewer):
-            # pop off old layers before adding new ones
-            for i in reversed(range(len(viewer.layers))):
-                viewer.layers.pop(i)
-
-            nonlocal current_file
-            current_file -= 1
-            try:
-                add_image_shape_to_viewer(
-                    viewer, image_collection[current_file], box_annotations
-                )
-            except IndexError:
-                logger.error("Exiting, no more files left to annotate")
-                sys.exit(1)
-            logger.info(
-                "Pressed previous key{}".format(current_file)
-            )
+            viewer, stack, box_annotations)
 
         @viewer.bind_key("s")
         def save_annotations(viewer):
             # TODO load frame here for both image and shapes here instead?
-            image = viewer.layers["image"]
             shape = viewer.layers["shape"]
-            nonlocal current_file
-            dirname = os.path.dirname(all_files[current_file])
+            image = viewer.layers["image"]
+            current_file = shape.z_index
             save_annotations_w_image(
                 image.data,
                 shape.data,
                 shape.properties,
-                os.path.join(dirname, save_bb_labels_dir),
-                os.path.join(dirname, save_overlay_dir),
+                save_overlay_path,
                 all_files[current_file],
             )
 

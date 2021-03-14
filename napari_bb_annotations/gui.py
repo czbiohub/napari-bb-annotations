@@ -108,7 +108,7 @@ def connect_to_viewer(viewer):
         assert os.path.exists(
             os.path.abspath(path)),
         "Path provided {} doesn't exist, please restart".format(path)
-        update_gui_btn = QPushButton("Update layers, only click once [u]")
+        update_gui_btn = QPushButton("Update layers, only click once per stack [u]")
         update_gui_btn.clicked.connect(
             lambda: update_layers(viewer, box_annotations))
 
