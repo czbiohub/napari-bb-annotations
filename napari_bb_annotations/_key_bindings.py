@@ -143,7 +143,6 @@ def save_bb_labels(viewer):
     df = pd.DataFrame(columns=LUMI_CSV_COLUMNS)
     logger.info("stack.shape {}".format(stack.shape))
     for stack_index in range(current_file + 1):
-        logger.info("stack_index is {}".format(stack_index))
         # visualization image
         image_at_index = stack[stack_index]
         file_path = metadata["all_files"][stack_index]

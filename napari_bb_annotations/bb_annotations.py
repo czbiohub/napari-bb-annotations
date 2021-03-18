@@ -69,10 +69,8 @@ def launch_viewer(path=None, format_of_files=None, box_annotations=None):
         assert os.path.exists(path)
         if type(box_annotations) is str:
             box_annotations = box_annotations.split(",")
-        dirname = location = os.path.dirname(path)
-        save_overlay_path = os.path.abspath(os.path.join(dirname, "overlay_dir"))
-        create_dir_if_not_exists(save_overlay_path)
 
+        location = os.path.dirname(path)
         if format_of_files not in IMAGE_FORMATS:
             filename_wo_format = os.path.basename(path).split(".")[0]
             output_frames_path = os.path.join(location, "frames_{}".format(filename_wo_format))
@@ -80,33 +78,35 @@ def launch_viewer(path=None, format_of_files=None, box_annotations=None):
             subprocess.check_call(
                 'ffmpeg -i "{}" -f image2 "{}/video-frame%05d.jpg"'.format(
                     path, output_frames_path), shell=True)
+            logger.info("subprocess call completed ")
             path = output_frames_path
             format_of_files = ".jpg"
+
+        dirname = os.path.dirname(path)
+        save_overlay_path = os.path.abspath(os.path.join(dirname, "overlay_dir"))
+        create_dir_if_not_exists(save_overlay_path)
         all_files = natsorted(
             glob.glob(os.path.join(path, "*" + format_of_files)))
+        logger.info("all files obtained")
         shape = imread(all_files[0]).shape
         total_files = len(all_files)
+        logger.info("all files obtained total is {}".format(total_files))
         if total_files == 0:
             logger.error("Exiting, no files left to annotate")
-        chunk_size = 100
-        pool_lists = []
-        subset_stacks = []
-        for i in range(0, len(all_files), chunk_size + 1):
-            pool_list = all_files[i: i + chunk_size + 1]
-            pool_lists.append(pool_list)
-            if len(shape) == 3:
-                stack = np.zeros((len(pool_list), shape[0], shape[1], shape[2]))
-            else:
-                stack = np.zeros((len(pool_list), shape[0], shape[1]))
-            subset_stacks.append(stack)
-        for index, pool_list in enumerate(pool_lists):
-            subset_stack = subset_stacks[index]
-            logger.info("subset_stack shape is {}".format(subset_stack.shape))
-            metadata = {
-                "save_overlay_path": save_overlay_path,
-                "all_files": pool_list}
-            add_image_shape_to_viewer(
-                viewer, subset_stack, box_annotations, metadata)
+        if len(shape) == 3:
+            stack = np.zeros((total_files, shape[0], shape[1], shape[2]), dtype=np.uint8)
+        else:
+            stack = np.zeros((total_files, shape[0], shape[1]), dtype=np.uint8)
+        for i in range(total_files):
+            stack[i] = imread(all_files[i])
+        logger.info("stack shape is {}".format(stack.shape))
+        metadata = {
+            "save_overlay_path": save_overlay_path,
+            "all_files": all_files}
+        logger.info("metadata set")
+        add_image_shape_to_viewer(
+            viewer, stack, box_annotations, metadata)
+        logger.info("image, shape added to viewer")
 
 
 def main():
