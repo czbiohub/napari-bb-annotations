@@ -41,27 +41,28 @@ class InputDialog(QDialog):
         return (self.first.text(), self.second.text(), self.third.text())
 
 
-def connect_to_viewer(viewer, path):
+def connect_to_viewer(viewer, path, format_of_files, box_annotations):
     """
     Add gui elements to the viewer
     """
-    dialog = InputDialog()
-    if dialog.exec():
-        path, format_of_files, box_annotations = dialog.getInputs()
-        update_gui_btn = QPushButton(
-            "Update layers, only click once per stack")
-        update_gui_btn.clicked.connect(
-            lambda: update_layers(viewer, box_annotations))
+    if (path and format_of_files and box_annotations) is not None:
+        dialog = InputDialog()
+        if dialog.exec():
+            path, format_of_files, box_annotations = dialog.getInputs()
+    update_gui_btn = QPushButton(
+        "Update layers, only click once per stack")
+    update_gui_btn.clicked.connect(
+        lambda: update_layers(viewer, box_annotations))
 
-        save_gui_btn = QPushButton("save annotations [shift + s]")
-        save_gui_btn.clicked.connect(lambda: save_bb_labels(viewer))
+    save_gui_btn = QPushButton("save annotations [shift + s]")
+    save_gui_btn.clicked.connect(lambda: save_bb_labels(viewer))
 
-        load_gui_btn = QPushButton("load annotations [shift + l]")
-        load_gui_btn.clicked.connect(lambda: load_bb_labels(viewer))
+    load_gui_btn = QPushButton("load annotations [shift + l]")
+    load_gui_btn.clicked.connect(lambda: load_bb_labels(viewer))
 
-        viewer.window.add_dock_widget(
-            [update_gui_btn, save_gui_btn, load_gui_btn],
-            area="right",
-            allowed_areas=["right", "left"],
-        )
-        return path, format_of_files, box_annotations
+    viewer.window.add_dock_widget(
+        [update_gui_btn, save_gui_btn, load_gui_btn],
+        area="right",
+        allowed_areas=["right", "left"],
+    )
+    return path, format_of_files, box_annotations

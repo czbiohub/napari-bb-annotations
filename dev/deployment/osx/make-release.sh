@@ -35,7 +35,7 @@ EOF
 
 # add __main__ for convenience
 cat <<EOF > bb_annotations.app/Contents/Resources/bb_annotations.py
-from napari_bb_annotations.bb_annotations import main
+from napari_bb_annotations.launcher.bb_annotations import main
 
 if __name__ == "__main__":
     main()

@@ -56,5 +56,8 @@ setup(
         'napari.plugin': [
             'napari-bb-annotations = napari_bb_annotations',
         ],
+        "console_scripts": [
+            "napari_bb_annotations = napari_bb_annotations.launcher.bb_annotations:main"
+        ]
     },
 )
