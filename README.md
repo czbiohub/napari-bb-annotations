@@ -36,17 +36,11 @@ You can install `napari-bb-annotations` via [pip]:
 
 Or
 
-MacOS: download the .app file or deploy the app file using `./dev/deployment/osx/make-release.sh` and then right click on the .app file created and get the path to app as below and provide the arguments to your H&E, binary data, and save paths
+MacOS: download the .app file or deploy the app file using `./dev/deployment/osx/make-release.sh` and then right click on the .app file created and get the path to app as below and provide the arguments to your path, format_of_files, box_annotations
 
-`/Users/pranathi.vemuri/Downloads/napari-he-annotations_0.0.1.app/Contents/MacOS/bb_annotations 
-        --path ./data/jpgstoannotated/ \
-		--format_of_files .jpg \
-		--box_annotations class1 class2 class3 `
+`/Users/pranathi.vemuri/Downloads/napari-he-annotations_0.0.1.app/Contents/MacOS/bb_annotations --path ./data/jpgstoannotated/ --format_of_files .jpg --box_annotations class1 class2 class3 `
 
-If you were given a .bz2 file, double-click to extract the .app file from the archive. Right-click the .app file and get the path to the app by clicking on `Get info` and provide the arguments to your H&E, binary data, as above
-
-Convert any jpg images to tifs using imagemagick convert
-```convert -compress -adjoin none *.jpg *.tif```.
+If you were given a .bz2 file, double-click to extract the .app file from the archive. Right-click the .app file and get the path to the app by clicking on `Get info` and provide the arguments to your path, format_of_files, box_annotations, as above
 
 
 Once the app opens up, 
