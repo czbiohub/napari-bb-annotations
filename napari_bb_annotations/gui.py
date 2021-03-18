@@ -1,73 +1,17 @@
-from qtpy.QtWidgets import QInputDialog, QLineEdit, QWidget, QFormLayout, QDialogButtonBox, QDialog, QPushButton
-from magicgui.widgets import ComboBox, Container
+import datetime
+import logging
 import os
+import re
 import numpy as np
+import pandas as pd
 
+from qtpy.QtWidgets import (QInputDialog, QLineEdit, QWidget, QFormLayout,
+                            QDialogButtonBox, QDialog, QPushButton)
+from magicgui.widgets import ComboBox, Container
+from PIL import ImageDraw
+from napari import Viewer
 
-# create the GUI for selecting the values
-def create_label_menu(shapes_layer, labels):
-    """Create a label menu widget that can be added to the napari viewer dock
-
-    Parameters:
-    -----------
-    shapes_layer : napari.layers.Shapes
-        a napari shapes layer
-    label_property : str
-        the name of the shapes property to use the displayed text
-    labels : List[str]
-        list of the possible text labels values.
-
-    Returns:
-    --------
-    label_widget : magicgui.widgets.Container
-        the container widget with the label combobox
-    """
-    # Create the label selection menu
-    label_property = text_property = "box_label"
-    label_menu = ComboBox(label='text label', choices=labels)
-    label_widget = Container(widgets=[label_menu])
-
-    def update_label_menu(event):
-        """This is a callback function that updates the label menu when
-        the current properties of the Shapes layer change
-        """
-        new_label = str(shapes_layer.current_properties[label_property][0])
-        if new_label != label_menu.value:
-            label_menu.value = new_label
-
-    shapes_layer.events.current_properties.connect(update_label_menu)
-
-    def label_changed(event):
-        """This is acallback that update the current properties on the Shapes layer
-        when the label menu selection changes
-        """
-        selected_label = event.value
-        current_properties = shapes_layer.current_properties
-        current_properties[label_property] = np.asarray([selected_label])
-        shapes_layer.current_properties = current_properties
-
-    label_menu.changed.connect(label_changed)
-
-    return label_widget
-
-
-def update_layers(viewer, labels):
-    label_widget = create_label_menu(viewer, box_annotations)
-    label_property = text_property = "box_label"
-    text_color = 'black'
-    size = 10
-    shapes_layer = viewer.layers['shape']
-
-    # To fix bug in currently have for creating emtpy layers with text
-    # see: https://github.com/napari/napari/issues/2115
-    def on_data(event):
-        if viewer.layers['shape'].text.mode == 'none':
-            viewer.layers['shape'].text = text_property
-            viewer.layers['shape'].text.color = text_color
-            viewer.layers['shape'].text.size = size
-    viewer.layers['shape'].events.set_data.connect(on_data)
-    # add the label selection gui to the viewer as a dock widget
-    viewer.window.add_dock_widget(label_widget, area='right')
+from _key_bindings import update_layers, save_bb_labels, load_bb_labels
 
 
 class InputDialog(QDialog):
@@ -82,7 +26,9 @@ class InputDialog(QDialog):
 
         layout = QFormLayout(self)
         layout.addRow(
-            "Images/Video to annotate with bounding boxes", self.first)
+            "Images/Video to annotate with bounding boxes, " +
+            "Please make sure your data is in a separate directory where new files/folders" +
+            " can be added by the program and no other same format images exist", self.first)
         layout.addRow("Format of input, including .", self.second)
         layout.addRow(
             "Comma separated classes you want to annotate in the images",
@@ -97,24 +43,28 @@ class InputDialog(QDialog):
         return (self.first.text(), self.second.text(), self.third.text())
 
 
-def connect_to_viewer(viewer):
+def connect_to_viewer(viewer, path, format_of_files, box_annotations):
     """
     Add gui elements to the viewer
     """
-    dialog = InputDialog()
-    if dialog.exec():
-        path, format_of_files, box_annotations = dialog.getInputs()
-        box_annotations = box_annotations.split(",")
-        assert os.path.exists(
-            os.path.abspath(path)),
-        "Path provided {} doesn't exist, please restart".format(path)
-        update_gui_btn = QPushButton("Update layers, only click once per stack [u]")
-        update_gui_btn.clicked.connect(
-            lambda: update_layers(viewer, box_annotations))
+    if (path and format_of_files and box_annotations) is not None:
+        dialog = InputDialog()
+        if dialog.exec():
+            path, format_of_files, box_annotations = dialog.getInputs()
+    update_gui_btn = QPushButton(
+        "Update layers, only click once per stack")
+    update_gui_btn.clicked.connect(
+        lambda: update_layers(viewer, box_annotations))
 
-        viewer.window.add_dock_widget(
-            [update_gui_btn],
-            area="right",
-            allowed_areas=["right", "left"],
-        )
-        return path, format_of_files, box_annotations
+    save_gui_btn = QPushButton("save annotations [shift + s]")
+    save_gui_btn.clicked.connect(lambda: save_bb_labels(viewer))
+
+    load_gui_btn = QPushButton("load annotations [shift + l]")
+    load_gui_btn.clicked.connect(lambda: load_bb_labels(viewer))
+
+    viewer.window.add_dock_widget(
+        [update_gui_btn, save_gui_btn, load_gui_btn],
+        area="right",
+        allowed_areas=["right", "left"],
+    )
+    return path, format_of_files, box_annotations

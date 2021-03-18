@@ -1,15 +1,16 @@
+import argparse
 import datetime
+import glob
 import logging
 import os
 import subprocess
 
+from natsort import natsorted
 import napari
 import numpy as np
-import pandas as pd
-from skimage.io import imread, ImageCollection, collection
+from skimage.io import imread
 
 from gui import connect_to_viewer
-from PIL import ImageDraw
 
 
 # set up the annotation values and text display properties
@@ -33,137 +34,109 @@ fh.setFormatter(formatter)
 logger.addHandler(fh)
 
 IMAGE_FORMATS = [".png", ".tiff", ".tif", ".jpg", ".jpeg"]
-LUMI_CSV_COLUMNS = [
-    'image_id', 'xmin', 'xmax', 'ymin', 'ymax', 'label', 'prob']
 
 
-def draw_objects(draw, bboxes, labels):
-    """Draws the bounding box and label for each object."""
-    for index, bbox in enumerate(bboxes):
-        draw.rectangle([(bbox.xmin, bbox.ymin), (bbox.xmax, bbox.ymax)],
-                       outline='red')
-        draw.text((bbox.xmin + 10, bbox.ymin + 10),
-                  '%s' % (labels[index]),
-                  fill='red')
-
-
-def save_annotations_w_image(
-    stack,
-    bboxes,
-    labels,
-    save_overlay_path,
-    file_path,
-):
-    save_overlay_path = os.path.abspath(save_overlay_path)
-    df = pd.DataFrame(columns=LUMI_CSV_COLUMNS)
-    for image in stack:
-        # visualization image
-        image = image.convert('RGB')
-        draw_objects(ImageDraw.Draw(image), bboxes, labels)
-        for index, bbox in bboxes:
-            df = df.append(
-                {'image_id': file_path,
-                 'xmin': bbox.xmin,
-                 'xmax': bbox.xmax,
-                 'ymin': bbox.ymin,
-                 'ymax': bbox.ymax,
-                 'label': labels[index]}, ignore_index=True)
-
-        # save images
-        filename_wo_format = os.path.basename(file_path).split(".")[0]
-        overlaid_save_name = os.path.join(
-            save_overlay_path,
-            "{}_overlaid.png".format(filename_wo_format)
-        )
-        logger.info("saving images to {}".format(overlaid_save_name))
-
-        image.save(overlaid_save_name)
-        df.to_csv(os.path.join(
-            os.path.dirname(save_overlay_path), "{}_preds_val.csv".format(filename_wo_format)))
-
-
-def get_bbox_obj_detection(bbox):
-    """
-    Get the coordinates of the 4 corners of a
-    bounding box - expected to be in 'xyxy' format.
-    Result can be put directly into a napari shapes layer.
-
-    Order: top-left, bottom-left, bottom-right, top-right
-    numpy style [y, x]
-
-    """
-    x = (bbox[:, 1])
-    y = (bbox[:, 0])
-
-    x1 = x.min()
-    y1 = y.min()
-    x2 = x.max()
-    y2 = y.max()
-
-    return np.array([x1, y1, x2, y2])
+def create_dir_if_not_exists(path):
+    if not os.path.exists(path):
+        os.makedirs(path)
+    else:
+        logger.info("Path {} already exists, might be overwriting data".format(path))
 
 
 def imread_convert(f):
     return imread(f).astype(np.uint8)
 
 
-def add_image_shape_to_viewer(viewer, image, box_annotations):
+def add_image_shape_to_viewer(viewer, image, box_annotations, metadata):
     logger.info("adding image shape to viewer")
     logger.info("annotations added are {}".format(box_annotations))
-    viewer.add_image(image, name="image")
+    viewer.add_image(image, name="image", metadata=metadata)
     shapes = viewer.add_shapes(
         face_color='black', properties={'box_label': box_annotations}, ndim=3)
 
     shapes.text = 'box_label'
-    shapes.opacity = 0.3
+    # shapes.opacity = 0.2
     shapes.mode = 'add_rectangle'
 
 
-def launch_viewer():
+def launch_viewer(path=None, format_of_files=None, box_annotations=None):
     with napari.gui_qt():
         viewer = napari.Viewer()
-        path, format_of_files, box_annotations = connect_to_viewer(viewer)
-        dirname = location = os.path.dirname(path)
-        save_overlay_path = os.path.join(dirname, "overlay_dir"),
+        if (path and format_of_files and box_annotations) is not None:
+            connect_to_viewer(viewer, path, format_of_files, box_annotations)
+        else:
+            path, format_of_files, box_annotations = connect_to_viewer(viewer)
+        assert os.path.exists(path)
+        if type(box_annotations) is str:
+            box_annotations = box_annotations.split(",")
 
+        location = os.path.dirname(path)
         if format_of_files not in IMAGE_FORMATS:
+            filename_wo_format = os.path.basename(path).split(".")[0]
+            output_frames_path = os.path.join(location, "frames_{}".format(filename_wo_format))
+            create_dir_if_not_exists(output_frames_path)
             subprocess.check_call(
                 'ffmpeg -i "{}" -f image2 "{}/video-frame%05d.jpg"'.format(
-                    path, location), shell=True)
-            image_collection = ImageCollection(
-                location + os.sep + "*.png",
-                load_func=imread_convert)
-        else:
-            image_collection = ImageCollection(
-                path + os.sep + "*" + format_of_files,
-                load_func=imread_convert)
-        stack = collection.concatenate_images(image_collection)
-        all_files = image_collection.files
-        logger.info("stack shape is {}".format(stack.shape))
-        total_files = len(image_collection)
+                    path, output_frames_path), shell=True)
+            logger.info("subprocess call completed ")
+            path = output_frames_path
+            format_of_files = ".jpg"
+
+        dirname = os.path.dirname(path)
+        save_overlay_path = os.path.abspath(os.path.join(dirname, "overlay_dir"))
+        create_dir_if_not_exists(save_overlay_path)
+        all_files = natsorted(
+            glob.glob(os.path.join(path, "*" + format_of_files)))
+        logger.info("all files obtained")
+        shape = imread(all_files[0]).shape
+        total_files = len(all_files)
+        logger.info("all files obtained total is {}".format(total_files))
         if total_files == 0:
             logger.error("Exiting, no files left to annotate")
-
+        if len(shape) == 3:
+            stack = np.zeros((total_files, shape[0], shape[1], shape[2]), dtype=np.uint8)
+        else:
+            stack = np.zeros((total_files, shape[0], shape[1]), dtype=np.uint8)
+        for i in range(total_files):
+            stack[i] = imread(all_files[i])
+        logger.info("stack shape is {}".format(stack.shape))
+        metadata = {
+            "save_overlay_path": save_overlay_path,
+            "all_files": all_files}
+        logger.info("metadata set")
         add_image_shape_to_viewer(
-            viewer, stack, box_annotations)
-
-        @viewer.bind_key("s")
-        def save_annotations(viewer):
-            # TODO load frame here for both image and shapes here instead?
-            shape = viewer.layers["shape"]
-            image = viewer.layers["image"]
-            current_file = shape.z_index
-            save_annotations_w_image(
-                image.data,
-                shape.data,
-                shape.properties,
-                save_overlay_path,
-                all_files[current_file],
-            )
+            viewer, stack, box_annotations, metadata)
+        logger.info("image, shape added to viewer")
 
 
 def main():
-    launch_viewer()
+
+    parser = argparse.ArgumentParser(
+        description="napari viewer for bounding box and labels annotationn"
+    )
+    parser.add_argument(
+        "--path",
+        help="Images/Video to annotate with bounding boxes, " +
+             "Please make sure your data is in a separate directory where new files/folders" +
+             " can be added by the program and no other same format images exist",
+        required=True)
+    parser.add_argument(
+        "--format_of_files",
+        help="Format of input, including .",
+        required=True)
+    parser.add_argument(
+        "--box_annotations",
+        nargs="*",
+        help="Comma separated classes you want to annotate in the images",
+        required=True
+    )
+
+    args = parser.parse_args()
+    launch_viewer(
+        args.path,
+        args.format_of_files,
+        args.box_annotations,
+    )
 
 
 if __name__ == "__main__":
