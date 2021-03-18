@@ -24,13 +24,24 @@ https://napari.org/docs/plugins/index.html
 
 You can install `napari-bb-annotations` via [pip]:
 
-    pip install napari-bb-annotations
+    git clone https://github.com/czbiohub/napari-bb-annotations.git
+    cd napari-bb-annotations
+    conda env create -n napari-bb-annotations -f environment.yml
+    conda activate napari-bb-annotations
+    python setup.py install
+    python napari_bb_annotations/launcher/bb_annotations.py \
+        --path ./data/jpgstoannotated/ \
+		--format_of_files .jpg \
+		--box_annotations class1 class2 class3 `
 
 Or
 
 MacOS: download the .app file or deploy the app file using `./dev/deployment/osx/make-release.sh` and then right click on the .app file created and get the path to app as below and provide the arguments to your H&E, binary data, and save paths
 
-`/Users/pranathi.vemuri/Downloads/napari-he-annotations_0.0.1.app/Contents/MacOS/bb_annotations`
+`/Users/pranathi.vemuri/Downloads/napari-he-annotations_0.0.1.app/Contents/MacOS/bb_annotations 
+        --path ./data/jpgstoannotated/ \
+		--format_of_files .jpg \
+		--box_annotations class1 class2 class3 `
 
 If you were given a .bz2 file, double-click to extract the .app file from the archive. Right-click the .app file and get the path to the app by clicking on `Get info` and provide the arguments to your H&E, binary data, as above
 
