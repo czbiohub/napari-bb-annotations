@@ -3,7 +3,7 @@ try:
 except ImportError:
     __version__ = "unknown"
 
-from .bb_annotations import main
+from . import _key_bindings
 
 
-__all__ = ["main"]
+del _key_bindings
