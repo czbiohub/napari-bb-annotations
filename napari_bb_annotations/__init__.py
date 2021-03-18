@@ -3,7 +3,7 @@ try:
 except ImportError:
     __version__ = "unknown"
 
-from .bb_annotations import main
+from .bb_annotations import launch_viewer
 
 
-__all__ = ["main"]
+__all__ = ["launch_viewer"]

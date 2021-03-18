@@ -59,13 +59,10 @@ def add_image_shape_to_viewer(viewer, image, box_annotations, metadata):
     shapes.mode = 'add_rectangle'
 
 
-def launch_viewer(path=None, format_of_files=None, box_annotations=None):
+def launch_viewer():
     with napari.gui_qt():
         viewer = napari.Viewer()
-        if (path and format_of_files and box_annotations) is not None:
-            connect_to_viewer(viewer, path, format_of_files, box_annotations)
-        else:
-            path, format_of_files, box_annotations = connect_to_viewer(viewer)
+        path, format_of_files, box_annotations = connect_to_viewer(viewer)
         assert os.path.exists(path)
         if type(box_annotations) is str:
             box_annotations = box_annotations.split(",")
@@ -109,35 +106,5 @@ def launch_viewer(path=None, format_of_files=None, box_annotations=None):
         logger.info("image, shape added to viewer")
 
 
-def main():
-
-    parser = argparse.ArgumentParser(
-        description="napari viewer for bounding box and labels annotationn"
-    )
-    parser.add_argument(
-        "--path",
-        help="Images/Video to annotate with bounding boxes, " +
-             "Please make sure your data is in a separate directory where new files/folders" +
-             " can be added by the program and no other same format images exist",
-        required=True)
-    parser.add_argument(
-        "--format_of_files",
-        help="Format of input, including .",
-        required=True)
-    parser.add_argument(
-        "--box_annotations",
-        nargs="*",
-        help="Comma separated classes you want to annotate in the images",
-        required=True
-    )
-
-    args = parser.parse_args()
-    launch_viewer(
-        args.path,
-        args.format_of_files,
-        args.box_annotations,
-    )
-
-
 if __name__ == "__main__":
-    main()
+    launch_viewer()
