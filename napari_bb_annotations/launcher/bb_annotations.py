@@ -3,13 +3,14 @@ import glob
 import logging
 import os
 import subprocess
+import sys
 
 from natsort import natsorted
 import napari
 import numpy as np
 from skimage.io import imread
 
-from .gui import connect_to_viewer
+from napari_bb_annotations.gui import connect_to_viewer
 
 
 # set up the annotation values and text display properties
@@ -19,18 +20,13 @@ logger.setLevel(logging.INFO)
 # create file handler which logs even info messages
 now = datetime.datetime.now()
 date_time = now.strftime("%m_%d_%Y_%H_%M_%S")
-fh = logging.FileHandler("bb_annotations_{}.log".format(date_time), "w")
+handler = logging.StreamHandler(sys.stdout)
 logging.basicConfig(
     format="%(asctime)s,%(msecs)d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s",
     datefmt="%Y-%m-%d:%H:%M:%S",
     level=logging.INFO,
 )
-formatter = logging.Formatter(
-    "%(asctime)s,%(msecs)d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s"
-)
-fh.setLevel(logging.INFO)
-fh.setFormatter(formatter)
-logger.addHandler(fh)
+logger.addHandler(handler)
 
 IMAGE_FORMATS = [".png", ".tiff", ".tif", ".jpg", ".jpeg"]
 
@@ -39,7 +35,8 @@ def create_dir_if_not_exists(path):
     if not os.path.exists(path):
         os.makedirs(path)
     else:
-        logger.info("Path {} already exists, might be overwriting data".format(path))
+        logger.info(
+            "Path {} already exists, might be overwriting data".format(path))
 
 
 def imread_convert(f):
@@ -58,10 +55,13 @@ def add_image_shape_to_viewer(viewer, image, box_annotations, metadata):
     shapes.mode = 'add_rectangle'
 
 
-def launch_viewer():
+def launch_viewer(path=None, format_of_files=None, box_annotations=None):
     with napari.gui_qt():
         viewer = napari.Viewer()
-        path, format_of_files, box_annotations = connect_to_viewer(viewer)
+        if (path and format_of_files and box_annotations) is not None:
+            connect_to_viewer(viewer, path, format_of_files, box_annotations)
+        else:
+            path, format_of_files, box_annotations = connect_to_viewer(viewer)
         assert os.path.exists(path)
         if type(box_annotations) is str:
             box_annotations = box_annotations.split(",")
@@ -69,7 +69,8 @@ def launch_viewer():
         location = os.path.dirname(path)
         if format_of_files not in IMAGE_FORMATS:
             filename_wo_format = os.path.basename(path).split(".")[0]
-            output_frames_path = os.path.join(location, "frames_{}".format(filename_wo_format))
+            output_frames_path = os.path.join(
+                location, "frames_{}".format(filename_wo_format))
             create_dir_if_not_exists(output_frames_path)
             subprocess.check_call(
                 'ffmpeg -i "{}" -f image2 "{}/video-frame%05d.jpg"'.format(
@@ -79,7 +80,8 @@ def launch_viewer():
             format_of_files = ".jpg"
 
         dirname = os.path.dirname(path)
-        save_overlay_path = os.path.abspath(os.path.join(dirname, "overlay_dir"))
+        save_overlay_path = os.path.abspath(
+            os.path.join(dirname, "overlay_dir"))
         create_dir_if_not_exists(save_overlay_path)
         all_files = natsorted(
             glob.glob(os.path.join(path, "*" + format_of_files)))
@@ -90,7 +92,8 @@ def launch_viewer():
         if total_files == 0:
             logger.error("Exiting, no files left to annotate")
         if len(shape) == 3:
-            stack = np.zeros((total_files, shape[0], shape[1], shape[2]), dtype=np.uint8)
+            stack = np.zeros(
+                (total_files, shape[0], shape[1], shape[2]), dtype=np.uint8)
         else:
             stack = np.zeros((total_files, shape[0], shape[1]), dtype=np.uint8)
         for i in range(total_files):
@@ -105,5 +108,33 @@ def launch_viewer():
         logger.info("image, shape added to viewer")
 
 
+def main():
+
+    parser = argparse.ArgumentParser(
+        description="napari viewer for bounding box and labels annotationn"
+    )
+    parser.add_argument(
+        "--path",
+        help="Images/Video to annotate with bounding boxes",
+        required=True)
+    parser.add_argument(
+        "--format_of_files",
+        help="Format of input, including .",
+        required=True)
+    parser.add_argument(
+        "--box_annotations",
+        nargs="*",
+        help="Comma separated classes you want to annotate in the images",
+        required=True
+    )
+
+    args = parser.parse_args()
+    launch_viewer(
+        args.path,
+        args.format_of_files,
+        args.box_annotations,
+    )
+
+
 if __name__ == "__main__":
-    launch_viewer()
+    main()

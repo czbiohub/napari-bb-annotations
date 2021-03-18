@@ -1,5 +1,6 @@
 from magicgui.widgets import ComboBox, Container
 import logging
+import sys
 import os
 import datetime
 import numpy as np
@@ -17,18 +18,13 @@ logger.setLevel(logging.INFO)
 # create file handler which logs even info messages
 now = datetime.datetime.now()
 date_time = now.strftime("%m_%d_%Y_%H_%M_%S")
-fh = logging.FileHandler("bb_annotations_{}.log".format(date_time), "w")
+handler = logging.StreamHandler(sys.stdout)
 logging.basicConfig(
     format="%(asctime)s,%(msecs)d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s",
     datefmt="%Y-%m-%d:%H:%M:%S",
     level=logging.INFO,
 )
-formatter = logging.Formatter(
-    "%(asctime)s,%(msecs)d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s"
-)
-fh.setLevel(logging.INFO)
-fh.setFormatter(formatter)
-logger.addHandler(fh)
+logger.addHandler(handler)
 
 
 def check_bbox(bbox, width, height):
@@ -135,17 +131,25 @@ def save_bb_labels(viewer):
     shape = viewer.layers["Shapes"]
     image = viewer.layers["image"]
     metadata = viewer.layers["image"].metadata
-    current_file = viewer.dims.current_step[0]
     stack = image.data
     bboxes = shape.data
     labels = shape.properties["box_label"].tolist()
     save_overlay_path = metadata["save_overlay_path"]
+    csv_path = os.path.join(
+        os.path.dirname(save_overlay_path), "bb_labels.csv")
     df = pd.DataFrame(columns=LUMI_CSV_COLUMNS)
+    z_indices = []
+    for bbox in bboxes:
+        z_index = np.unique((bbox[:, 0])).tolist()
+        assert len(z_index) == 1
+        z_indices.append(z_index[0])
+    z_indices = np.unique(z_indices).tolist()
+    logger.info("z_indices {}".format(z_indices))
     logger.info("stack.shape {}".format(stack.shape))
-    for stack_index in range(current_file + 1):
+    for stack_index in z_indices:
         # visualization image
-        image_at_index = stack[stack_index]
-        file_path = metadata["all_files"][stack_index]
+        image_at_index = stack[int(stack_index)]
+        file_path = metadata["all_files"][int(stack_index)]
         height, width = image_at_index.shape[:2]
         image_at_index = Image.fromarray(image_at_index)
         image_at_index = image_at_index.convert('RGB')
@@ -167,7 +171,9 @@ def save_bb_labels(viewer):
                 labels_for_image.append(label)
                 bboxes_converted.append(bbox)
         if len(bboxes_converted) != 0:
-            draw_objects(ImageDraw.Draw(image_at_index), bboxes_converted, labels_for_image)
+            draw_objects(
+                ImageDraw.Draw(image_at_index),
+                bboxes_converted, labels_for_image)
             # save images
             filename_wo_format = os.path.basename(file_path).split(".")[0]
             overlaid_save_name = os.path.join(
@@ -177,18 +183,41 @@ def save_bb_labels(viewer):
             logger.info("saving images to {}".format(overlaid_save_name))
 
             image_at_index.save(overlaid_save_name)
-    logger.info("csv path is {}".format(os.path.dirname(
-        save_overlay_path), "{_preds_val.csv"))
-    df.to_csv(os.path.join(
-        os.path.dirname(save_overlay_path), "preds_val.csv"))
+    logger.info("csv path is {}".format(csv_path))
+    df.to_csv(csv_path)
 
 
 @Viewer.bind_key('Shift-l')
 def load_bb_labels(viewer):
-    pass
+    logger.info("Pressed key Shift-l")
+    all_files = viewer.layers["image"].metadata["all_files"]
+    dirname = os.path.dirname(all_files[0])
+    df = pd.read_csv(os.path.join(
+        dirname, "bb_labels.csv"))
+    shape = viewer.layers["Shapes"]
+    bboxes = shape.data
+    labels = shape.properties["box_label"].tolist()
+    logger.info("labels before {}".format(labels))
+    for index, row in df.iterrows():
+        x1 = row.xmin
+        x2 = row.xmax
+        y1 = row.ymin
+        y2 = row.ymax
+        label = row.label
+        image_id = row.image_id
+        z = all_files.index(image_id)
+        bbox_rect = np.array(
+            [[z, y1, x1], [z, y2, x1], [z, y2, x2], [z, y1, x2]]
+        )
+        bboxes.append(bbox_rect)
+        labels.append(label)
+    logger.info("labels after {}".format(labels))
+    viewer.layers["Shapes"].data = bboxes
+    viewer.layers["Shapes"].properties["box_label"] = np.array(labels)
 
 
 def update_layers(viewer, box_annotations):
+    logger.info("Pressed update layers button")
     shapes_layer = viewer.layers['Shapes']
 
     label_widget = create_label_menu(shapes_layer, box_annotations)
