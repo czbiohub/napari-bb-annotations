@@ -26,6 +26,29 @@ You can install `napari-bb-annotations` via [pip]:
 
     pip install napari-bb-annotations
 
+Or
+
+MacOS: download the .app file or deploy the app file using `./dev/deployment/osx/make-release.sh` and then right click on the .app file created and get the path to app as below and provide the arguments to your H&E, binary data, and save paths
+
+`/Users/pranathi.vemuri/Downloads/napari-he-annotations_0.0.1.app/Contents/MacOS/bb_annotations`
+
+If you were given a .bz2 file, double-click to extract the .app file from the archive. Right-click the .app file and get the path to the app by clicking on `Get info` and provide the arguments to your H&E, binary data, as above
+
+Convert any jpg images to tifs using imagemagick convert
+```convert -compress -adjoin none *.jpg *.tif```.
+
+
+Once the app opens up, 
+1. Enter the path of your folder containing `images` or `video` subfolders into the file dialog like so using flags `--path /Users/pranathi.vemuri/napari-bb-annotations/data/`, `--format_of_files .jpg` and `box_annotations class1 class2 class3 class4 `
+2. If you are opening the app using cli and have already given paths, please click the cancel button when it asks for path, box_annotations, and format_of_files again
+3. Click the `Shift-l` key or load annotations button if you have a csv annotations that was saved previously you can reload it. Ignore this step if you do not have the annotations previously saved as well as press this only once per stack. Once you click load the bounding boxes are updated but not the label yet, Step 6 actually enables the correct labels, i.e click `Update layers` after load if you have previous annotations, otherwise just press `Update layers`
+4. Note to correct the loaded annotations currently, there is only way to correct both bounding box and the label, we are working on correcting just the label if the bounding box is correct
+5. Click the `Select shapes` button to delete the selected box and label using `x` symbol on the left among different arrows for the shape layer
+6. Click `Update layers` button only once per stack to see the dock with the `box_annotations` 
+7. Click `Shift-s` to save the bounding boxes, classes along with the image path to `bb_labels.csv` or bounding boxes, labels overlaid image, you can click `s` any number of times as you progress, the overlay directory is created inside the path with the name `overlay_dir`
+8. Write frame number near the frame slider to skip to a slide, otherwise clicking the slider right and left arrows will make you switch before different frames
+
+
 ## Contributing
 
 Contributions are very welcome. Tests can be run with [tox], please ensure
