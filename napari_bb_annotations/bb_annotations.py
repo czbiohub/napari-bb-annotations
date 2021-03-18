@@ -10,7 +10,7 @@ import napari
 import numpy as np
 from skimage.io import imread
 
-from gui import connect_to_viewer
+from .gui import connect_to_viewer
 
 
 # set up the annotation values and text display properties

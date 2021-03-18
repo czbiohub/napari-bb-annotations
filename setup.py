@@ -36,6 +36,7 @@ setup(
     packages=find_packages(),
     python_requires='>=3.6',
     install_requires=requirements,
+    dependency_links=['http://github.com/napari/napari/tarball/master#egg=napari'],
     use_scm_version=use_scm,
     setup_requires=['setuptools_scm'],
     classifiers=[

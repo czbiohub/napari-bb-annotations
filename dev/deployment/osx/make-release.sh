@@ -19,7 +19,7 @@ RELEASE_ENV=${CONDA_ROOT}/envs/napari-bb-annotations-release
 conda env remove -y -q -n napari-bb-annotations-release
 
 echo "Creating new release environment"
-conda create -q -y -n napari-bb-annotations-release --file requirements.txt -c conda-forge python==3.7
+conda env create -n napari-bb-annotations-release -f environment.yml
 conda activate napari-bb-annotations-release
 ${RELEASE_ENV}/bin/python setup.py install
 conda install -y pyqt

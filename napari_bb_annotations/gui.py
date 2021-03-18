@@ -11,7 +11,7 @@ from magicgui.widgets import ComboBox, Container
 from PIL import ImageDraw
 from napari import Viewer
 
-from _key_bindings import update_layers, save_bb_labels, load_bb_labels
+from ._key_bindings import update_layers, save_bb_labels, load_bb_labels
 
 
 class InputDialog(QDialog):
@@ -26,9 +26,7 @@ class InputDialog(QDialog):
 
         layout = QFormLayout(self)
         layout.addRow(
-            "Images/Video to annotate with bounding boxes, " +
-            "Please make sure your data is in a separate directory where new files/folders" +
-            " can be added by the program and no other same format images exist", self.first)
+            "Images/Video to annotate with bounding boxes, labels", self.first)
         layout.addRow("Format of input, including .", self.second)
         layout.addRow(
             "Comma separated classes you want to annotate in the images",
