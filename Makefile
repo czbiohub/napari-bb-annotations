@@ -1,6 +1,6 @@
-BOX_ANNOTATIONS=classone classtwo classthree
-PATH=./data/jpg_images/
-FORMAT_OF_FILES=.jpg
+BOX_ANNOTATIONS=class1 class2 class3 class4
+PATH=./data/
+FORMAT_OF_FILES=.jpeg
 
 napari-viewer:
 	python napari_bb_annotations/launcher/bb_annotations.py \

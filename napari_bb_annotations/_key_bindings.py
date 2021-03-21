@@ -8,6 +8,7 @@ import pandas as pd
 from PIL import Image, ImageDraw
 from napari import Viewer
 
+from napari_bb_annotations.run_inference import detect_images, DEFAULT_CONFIDENCE, DEFAULT_INFERENCE_COUNT
 
 LUMI_CSV_COLUMNS = [
     'image_id', 'xmin', 'xmax', 'ymin', 'ymax', 'label', 'prob']
@@ -112,7 +113,7 @@ def create_label_menu(shapes_layer, labels):
     shapes_layer.events.current_properties.connect(update_label_menu)
 
     def label_changed(event):
-        """This is acallback that update the current properties on the Shapes layer
+        """This is a callback that update the current properties on the Shapes layer
         when the label menu selection changes
         """
         selected_label = event.value
@@ -214,6 +215,28 @@ def load_bb_labels(viewer):
     logger.info("labels after {}".format(labels))
     viewer.layers["Shapes"].data = bboxes
     viewer.layers["Shapes"].properties["box_label"] = np.array(labels)
+
+
+@Viewer.bind_key('Shift-i')
+def run_inference_on_images(viewer):
+    logger.info("Pressed key Shift-i")
+    all_files = viewer.layers["image"].metadata["all_files"]
+    dirname = os.path.dirname(file)
+
+    box_annotations = viewer.layers["image"].metadata["box_annotations"]
+    model = viewer.layers["image"].metadata["model"]
+    use_tpu = viewer.layers["image"].metadata["use_tpu"]
+
+    labels = os.path.join(dirname, "labels.txt")
+    with open(labels, 'w') as f:
+        for index, label in box_annotations:
+            f.write('{} {}'.format(index, label))
+
+    filename = all_files[0]
+    format_of_files = os.path.splitext(filename)[1]
+    detect_images(
+        model, use_tpu, dirname, format_of_files,
+        labels, DEFAULT_CONFIDENCE, dirname, DEFAULT_INFERENCE_COUNT, False)
 
 
 def update_layers(viewer, box_annotations):

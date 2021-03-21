@@ -77,3 +77,6 @@ target/
 
 # written by setuptools_scm
 */_version.py
+
+*/data/overlay_dir
+*/data/bb_labels.csv

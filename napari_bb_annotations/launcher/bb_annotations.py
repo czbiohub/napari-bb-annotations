@@ -56,13 +56,14 @@ def add_image_shape_to_viewer(viewer, image, box_annotations, metadata):
     shapes.mode = 'add_rectangle'
 
 
-def launch_viewer(path=None, format_of_files=None, box_annotations=None):
+def launch_viewer(
+        path=None, format_of_files=None, box_annotations=None, model=None, edgetpu=None):
     with napari.gui_qt():
         viewer = napari.Viewer()
         if (path and format_of_files and box_annotations) is not None:
             connect_to_viewer(viewer, path, format_of_files, box_annotations)
         else:
-            path, format_of_files, box_annotations = connect_to_viewer(viewer)
+            path, format_of_files, box_annotations, model, edgetpu = connect_to_viewer(viewer)
         assert os.path.exists(path)
         if type(box_annotations) is str:
             box_annotations = box_annotations.split(",")
@@ -102,7 +103,10 @@ def launch_viewer(path=None, format_of_files=None, box_annotations=None):
         logger.info("stack shape is {}".format(stack.shape))
         metadata = {
             "save_overlay_path": save_overlay_path,
-            "all_files": all_files}
+            "all_files": all_files,
+            "box_annotations": box_annotations,
+            "model": model,
+            "edgetpu": edgetpu}
         logger.info("metadata set")
         add_image_shape_to_viewer(
             viewer, stack, box_annotations, metadata)
@@ -128,12 +132,21 @@ def main():
         help="Comma separated classes you want to annotate in the images",
         required=True
     )
+    parser.add_argument(
+        '--edgetpu',
+        help='Use Coral Edge TPU Accelerator to speed up detection',
+        action='store_true')
+    parser.add_argument(
+        '-m', '--model', required=False,
+        help='File path of .tflite file.')
 
     args = parser.parse_args()
     launch_viewer(
         args.path,
         args.format_of_files,
         args.box_annotations,
+        args.model,
+        args.edgetpu
     )
 
 
