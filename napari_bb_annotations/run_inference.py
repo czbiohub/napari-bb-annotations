@@ -23,7 +23,7 @@ import pandas as pd
 from PIL import Image
 from PIL import ImageDraw
 
-import detect
+import napari_bb_annotations.detect as detect
 import tflite_runtime.interpreter as tflite
 import platform
 

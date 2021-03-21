@@ -1,7 +1,7 @@
 set -e
 set -x
 
-RELEASE_VERSION=0.0.1
+RELEASE_VERSION=0.0.2
 
 echo "Creating app bundle for napari-bb-annotations ${RELEASE_VERSION}"
 
