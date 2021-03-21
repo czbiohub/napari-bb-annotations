@@ -1,6 +1,5 @@
 from magicgui.widgets import ComboBox, Container
 import logging
-import sys
 import os
 import datetime
 import numpy as np
@@ -19,14 +18,11 @@ logger.setLevel(logging.INFO)
 # create file handler which logs even info messages
 now = datetime.datetime.now()
 date_time = now.strftime("%m_%d_%Y_%H_%M_%S")
-handler = logging.StreamHandler(sys.stdout)
 logging.basicConfig(
     format="%(asctime)s,%(msecs)d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s",
     datefmt="%Y-%m-%d:%H:%M:%S",
     level=logging.INFO,
 )
-if not logger.handlers:
-    logger.addHandler(handler)
 
 
 def check_bbox(bbox, width, height):
