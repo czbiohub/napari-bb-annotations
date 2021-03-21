@@ -21,4 +21,4 @@ scikit-image==0.17.2
 toolz>=0.10.0
 vispy>=0.6.4
 wrapt>=1.11.1
-# git+https://github.com/napari/napari.git@master#egg=napari
+git+https://github.com/napari/napari.git@@1aa75f0e046430c9da7a897599404ef61917e7a4
