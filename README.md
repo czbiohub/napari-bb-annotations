@@ -40,6 +40,14 @@ MacOS: download the .app file or deploy the app file using `./dev/deployment/osx
 
 `/Users/pranathi.vemuri/Downloads/napari-he-annotations_0.0.1.app/Contents/MacOS/bb_annotations --path ./data/jpgstoannotated/ --format_of_files .jpg --box_annotations class1 class2 class3 `
 
+If you have a tflite model and its edgetpu compatible and you want to run inference and load those annotations, correct them use the below command
+
+`/Users/pranathi.vemuri/Downloads/napari-he-annotations_0.0.1.app/Contents/MacOS/bb_annotations --path ./data/jpgstoannotated/ --format_of_files .jpg --box_annotations class1 class2 class3 --model ./czbiohub/ulc-malaria-scope/models/output_tflite_graph.tflite --edgetpu`
+
+If you have a tflite model and its not edgetpu compatible, do not give the `--edgetpu` flag and you want to run inference and load those annotations, correct them use the below command
+
+`/Users/pranathi.vemuri/Downloads/napari-he-annotations_0.0.1.app/Contents/MacOS/bb_annotations --path ./data/jpgstoannotated/ --format_of_files .jpg --box_annotations class1 class2 class3 --model ./czbiohub/ulc-malaria-scope/models/output_tflite_graph.tflite`
+
 If you were given a .bz2 file, double-click to extract the .app file from the archive. Right-click the .app file and get the path to the app by clicking on `Get info` and provide the arguments to your path, format_of_files, box_annotations, as above
 
 
@@ -52,7 +60,7 @@ Once the app opens up,
 6. Click `Update layers` button only once per stack to see the dock with the `box_annotations` 
 7. Click `Shift-s` to save the bounding boxes, classes along with the image path to `bb_labels.csv` or bounding boxes, labels overlaid image, you can click `s` any number of times as you progress, the overlay directory is created inside the path with the name `overlay_dir`
 8. Write frame number near the frame slider to skip to a slide, otherwise clicking the slider right and left arrows will make you switch before different frames
-9. To run inference, give the inputs of model i.e the path to tflite file, edgetpu flag (set it if you have a coral connected) - The model will use tflite_runtime to infer/predict the bounding boxes, labels when you click `run inference ` button and to load those annotations click load annotations. Running inference should be the first steps if you want to figure out bounding boxes, labels and correct them
+9. To run inference, give the inputs of model i.e the path to tflite file, edgetpu flag (set it if you have a coral connected) - The model will use tflite_runtime to infer/predict the bounding boxes, labels when you click `run inference ` button and to load those annotations click `load annotations`. Running inference should be the first steps if you want to figure out bounding boxes, labels and correct them
 
 To use inferencing, install tflite_runtime for mac with 3.5 as below, to figure out a different wheel based on your platform go here - https://github.com/google-coral/pycoral/releases/
 
