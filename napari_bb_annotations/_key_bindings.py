@@ -25,7 +25,8 @@ logging.basicConfig(
     datefmt="%Y-%m-%d:%H:%M:%S",
     level=logging.INFO,
 )
-logger.addHandler(handler)
+if not logger.handlers:
+    logger.addHandler(handler)
 
 
 def check_bbox(bbox, width, height):
@@ -221,22 +222,22 @@ def load_bb_labels(viewer):
 def run_inference_on_images(viewer):
     logger.info("Pressed key Shift-i")
     all_files = viewer.layers["image"].metadata["all_files"]
-    dirname = os.path.dirname(file)
+    filename = all_files[0]
+    dirname = os.path.dirname(filename)
 
     box_annotations = viewer.layers["image"].metadata["box_annotations"]
     model = viewer.layers["image"].metadata["model"]
-    use_tpu = viewer.layers["image"].metadata["use_tpu"]
+    use_tpu = viewer.layers["image"].metadata["edgetpu"]
 
-    labels = os.path.join(dirname, "labels.txt")
-    with open(labels, 'w') as f:
-        for index, label in box_annotations:
-            f.write('{} {}'.format(index, label))
+    labels_txt = os.path.join(dirname, "labels.txt")
+    with open(labels_txt, 'w') as f:
+        for index, label in enumerate(box_annotations):
+            f.write("{} {}\n".format(index, label))
 
-    filename = all_files[0]
     format_of_files = os.path.splitext(filename)[1]
     detect_images(
         model, use_tpu, dirname, format_of_files,
-        labels, DEFAULT_CONFIDENCE, dirname, DEFAULT_INFERENCE_COUNT, False)
+        labels_txt, DEFAULT_CONFIDENCE, dirname, DEFAULT_INFERENCE_COUNT, False)
 
 
 def update_layers(viewer, box_annotations):

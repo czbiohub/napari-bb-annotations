@@ -27,7 +27,8 @@ logging.basicConfig(
     datefmt="%Y-%m-%d:%H:%M:%S",
     level=logging.INFO,
 )
-logger.addHandler(handler)
+if not logger.handlers:
+    logger.addHandler(handler)
 
 IMAGE_FORMATS = [".png", ".tiff", ".tif", ".jpg", ".jpeg"]
 
@@ -61,7 +62,7 @@ def launch_viewer(
     with napari.gui_qt():
         viewer = napari.Viewer()
         if (path and format_of_files and box_annotations) is not None:
-            connect_to_viewer(viewer, path, format_of_files, box_annotations)
+            connect_to_viewer(viewer, path, format_of_files, box_annotations, model, edgetpu)
         else:
             path, format_of_files, box_annotations, model, edgetpu = connect_to_viewer(viewer)
         assert os.path.exists(path)
