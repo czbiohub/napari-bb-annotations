@@ -40,5 +40,5 @@ dependencies:
   - tifffile>=2020.2.16
   - typing_extensions
   - pip:
-    - git+git://github.com/napari/napari.git@1aa75f0e046430c9da7a897599404ef61917e7a4 # master - only until Kevin's commit to fix tests, other recent commits introduce bugs
+    - git+git://github.com/napari/napari.git@3188e86950d04ad6444cf620101922ad822d9dd6 # master - only until Kevin's commit to fix tests, other recent commits introduce bugs
 
