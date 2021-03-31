@@ -3,7 +3,7 @@ imageio-ffmpeg
 importlib-metadata>=1.5.0
 ipykernel>=5.1.1
 IPython>=7.7.0
-magicgui==0.2.5
+magicgui==0.2.8
 napari-plugin-engine>=0.1.5
 napari-svg>=0.1.3
 natsort

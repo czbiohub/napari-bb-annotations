@@ -1,17 +1,20 @@
-from magicgui.widgets import ComboBox, Container
+import datetime
 import logging
 import os
-import datetime
+import subprocess
+
 import numpy as np
 import pandas as pd
-from PIL import Image, ImageDraw
+from magicgui.widgets import ComboBox, Container, Table
 from napari import Viewer
+from PIL import Image, ImageDraw
 
-from napari_bb_annotations.run_inference import detect_images, DEFAULT_CONFIDENCE, DEFAULT_INFERENCE_COUNT
+from napari_bb_annotations.run_inference import (
+    detect_images, DEFAULT_CONFIDENCE, DEFAULT_INFERENCE_COUNT)
 
 LUMI_CSV_COLUMNS = [
     'image_id', 'xmin', 'xmax', 'ymin', 'ymax', 'label', 'prob']
-# set up the annotation values and text display properties
+
 # create the GUI for selecting the values
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -46,14 +49,25 @@ def check_bbox(bbox, width, height):
     return np.array([xmin, ymin, xmax, ymax])
 
 
-def draw_objects(draw, bboxes, labels):
+def draw_objects(draw, bboxes, labels, probs):
     """Draws the bounding box and label for each object."""
     for index, bbox in enumerate(bboxes):
         draw.rectangle([(bbox[0], bbox[1]), (bbox[2], bbox[3])],
                        outline='red')
-        draw.text((bbox[0] + 10, bbox[1] + 10),
-                  '%s' % (labels[index]),
-                  fill='red')
+        label = labels[index]
+        prob = probs[index]
+        if prob is not None:
+            prob = '({:.3f})'.format(prob)  # Turn `prob` into a string.
+            label = label + prob
+        if " " not in label:
+            draw.text((bbox[0] + 10, bbox[1] + 10),
+                      '%s' % (labels[index]),
+                      fill='red')
+        else:
+            split1, split2 = label.split(" ")
+            draw.text((bbox[0] + 10, bbox[1] + 10),
+                      '%s/n%s' % (split1, split2),
+                      fill='red')
 
 
 def get_bbox_obj_detection(bbox):
@@ -123,12 +137,57 @@ def create_label_menu(shapes_layer, labels):
     return label_widget
 
 
+def update_summary_table(shapes_layer, metadata):
+    labels = metadata["box_annotations"]
+    box_labels = shapes_layer.properties["box_label"].tolist()
+    split_dict = {
+        "data": [[box_labels.count(label)] for label in labels],
+        "index": tuple(labels),
+        "columns": ("c"),
+    }
+    table_widget = Table(value=split_dict)
+    label_property = "box_label"
+    label_menu = ComboBox(label='text label', choices=labels)
+
+    def update_table_on_label_change(event):
+        """This is a callback function that updates the summary table when
+        the current properties of the Shapes layer change or when you are
+        moving to next image or at the end of stack
+        """
+        new_label = str(shapes_layer.current_properties[label_property][0])
+        if new_label != label_menu.value:
+            box_labels = shapes_layer.properties["box_label"].tolist()
+            data = [[box_labels.count(label)] for label in labels]
+            split_dict = {
+                "data": data,
+                "index": tuple(labels),
+                "columns": ("c"),
+            }
+            table_widget.value = split_dict
+    shapes_layer.events.current_properties.connect(
+        update_table_on_label_change)
+
+    def update_table_on_coordinates_change(event):
+        box_labels = shapes_layer.properties["box_label"].tolist()
+        data = [[box_labels.count(label)] for label in labels]
+        split_dict = {
+            "data": data,
+            "index": tuple(labels),
+            "columns": ("c"),
+        }
+        table_widget.value = split_dict
+
+    shapes_layer.events.set_data.connect(update_table_on_coordinates_change)
+
+    return table_widget
+
+
 @Viewer.bind_key('Shift-S')
 def save_bb_labels(viewer):
     logger.info("Pressed key Shift-S")
     shape = viewer.layers["Shapes"]
-    image = viewer.layers["image"]
-    metadata = viewer.layers["image"].metadata
+    image = viewer.layers["Image"]
+    metadata = viewer.layers["Image"].metadata
     stack = image.data
     bboxes = shape.data
     labels = shape.properties["box_label"].tolist()
@@ -188,7 +247,7 @@ def save_bb_labels(viewer):
 @Viewer.bind_key('Shift-l')
 def load_bb_labels(viewer):
     logger.info("Pressed key Shift-l")
-    all_files = viewer.layers["image"].metadata["all_files"]
+    all_files = viewer.layers["Image"].metadata["all_files"]
     dirname = os.path.dirname(all_files[0])
     df = pd.read_csv(os.path.join(
         dirname, "bb_labels.csv"))
@@ -217,13 +276,14 @@ def load_bb_labels(viewer):
 @Viewer.bind_key('Shift-i')
 def run_inference_on_images(viewer):
     logger.info("Pressed key Shift-i")
-    all_files = viewer.layers["image"].metadata["all_files"]
+    image_layer = viewer.layers["Image"]
+    all_files = image_layer.metadata["all_files"]
     filename = all_files[0]
     dirname = os.path.dirname(filename)
 
-    box_annotations = viewer.layers["image"].metadata["box_annotations"]
-    model = viewer.layers["image"].metadata["model"]
-    use_tpu = viewer.layers["image"].metadata["edgetpu"]
+    box_annotations = image_layer.metadata["box_annotations"]
+    model = image_layer.metadata["model"]
+    use_tpu = image_layer.metadata["edgetpu"]
 
     labels_txt = os.path.join(dirname, "labels.txt")
     with open(labels_txt, 'w') as f:
@@ -231,18 +291,29 @@ def run_inference_on_images(viewer):
             f.write("{} {}\n".format(index, label))
 
     format_of_files = os.path.splitext(filename)[1]
-    detect_images(
-        model, use_tpu, dirname, format_of_files,
-        labels_txt, DEFAULT_CONFIDENCE, dirname, DEFAULT_INFERENCE_COUNT, False)
+    if model.endswith(".tflite"):
+        detect_images(
+            model, use_tpu, dirname, format_of_files,
+            labels_txt, DEFAULT_CONFIDENCE, dirname,
+            DEFAULT_INFERENCE_COUNT, False)
+    else:
+        csv_path = os.path.join(dirname, "bb_labels.csv")
+        subprocess.check_call(
+            'lumi predict {} --checkpoint {} -f {}'.format(
+                dirname, model, csv_path), shell=True)
+        logger.info("subprocess call completed ")
 
 
 def update_layers(viewer, box_annotations):
     logger.info("Pressed update layers button")
     shapes_layer = viewer.layers['Shapes']
+    shapes_layer.mode = 'add_rectangle'
 
     label_widget = create_label_menu(shapes_layer, box_annotations)
     text_property = "box_label"
     text_color = 'green'
+    text_size = 8
+
     # this is a hack to get around a bug we currently have
     # for creating emtpy layers with text
     # see: https://github.com/napari/napari/issues/2115
@@ -251,6 +322,16 @@ def update_layers(viewer, box_annotations):
         if shapes_layer.text.mode == 'none':
             shapes_layer.text = text_property
             shapes_layer.text.color = text_color
+            shapes_layer.text.size = text_size
     shapes_layer.events.set_data.connect(on_data)
     # add the label selection gui to the viewer as a dock widget
     viewer.window.add_dock_widget(label_widget, area='right')
+    table_widget = update_summary_table(
+        viewer.layers["Shapes"],
+        viewer.layers["Image"].metadata)
+    table_widget.min_width = 300
+    table_widget.min_height = 200
+    table_widget.max_width = 300
+    table_widget.max_height = 200
+
+    viewer.window.add_dock_widget(table_widget, area='right')

@@ -11,7 +11,7 @@ dependencies:
   - importlib-metadata>=1.5.0
   - ipykernel>=5.1.1
   - IPython>=7.7.0
-  - magicgui==0.2.5
+  - magicgui==0.2.8
   - natsort
   - numpy>=1.10
   - pandas
@@ -40,5 +40,5 @@ dependencies:
   - tifffile>=2020.2.16
   - typing_extensions
   - pip:
+    - tensorflow==1.13.2
     - git+git://github.com/napari/napari.git@3188e86950d04ad6444cf620101922ad822d9dd6 # master - only until Kevin's commit to fix tests, other recent commits introduce bugs
-
