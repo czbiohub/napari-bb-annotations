@@ -9,8 +9,6 @@ from magicgui.widgets import ComboBox, Container, Table
 from napari import Viewer
 from PIL import Image, ImageDraw
 
-from napari_bb_annotations.run_inference import (
-    detect_images, DEFAULT_CONFIDENCE, DEFAULT_INFERENCE_COUNT)
 
 LUMI_CSV_COLUMNS = [
     'image_id', 'xmin', 'xmax', 'ymin', 'ymax', 'label', 'prob']
@@ -49,16 +47,12 @@ def check_bbox(bbox, width, height):
     return np.array([xmin, ymin, xmax, ymax])
 
 
-def draw_objects(draw, bboxes, labels, probs):
+def draw_objects(draw, bboxes, labels):
     """Draws the bounding box and label for each object."""
     for index, bbox in enumerate(bboxes):
         draw.rectangle([(bbox[0], bbox[1]), (bbox[2], bbox[3])],
                        outline='red')
         label = labels[index]
-        prob = probs[index]
-        if prob is not None:
-            prob = '({:.3f})'.format(prob)  # Turn `prob` into a string.
-            label = label + prob
         if " " not in label:
             draw.text((bbox[0] + 10, bbox[1] + 10),
                       '%s' % (labels[index]),
@@ -224,7 +218,8 @@ def save_bb_labels(viewer):
                      'ymin': int(bbox[1]),
                      'xmax': int(bbox[2]),
                      'ymax': int(bbox[3]),
-                     'label': label}, ignore_index=True)
+                     'label': label,
+                     }, ignore_index=True)
                 labels_for_image.append(label)
                 bboxes_converted.append(bbox)
         if len(bboxes_converted) != 0:
@@ -232,10 +227,10 @@ def save_bb_labels(viewer):
                 ImageDraw.Draw(image_at_index),
                 bboxes_converted, labels_for_image)
             # save images
-            filename_wo_format = os.path.basename(file_path).split(".")[0]
+            basename = os.path.basename(file_path)
             overlaid_save_name = os.path.join(
                 save_overlay_path,
-                "{}_overlaid.png".format(filename_wo_format)
+                "pred_{}".format(basename)
             )
             logger.info("saving images to {}".format(overlaid_save_name))
 
@@ -254,7 +249,6 @@ def load_bb_labels(viewer):
     shape = viewer.layers["Shapes"]
     bboxes = shape.data
     labels = shape.properties["box_label"].tolist()
-    logger.info("labels before {}".format(labels))
     for index, row in df.iterrows():
         x1 = row.xmin
         x2 = row.xmax
@@ -268,40 +262,81 @@ def load_bb_labels(viewer):
         )
         bboxes.append(bbox_rect)
         labels.append(label)
-    logger.info("labels after {}".format(labels))
+    viewer.layers["Shapes"].data = bboxes
+    viewer.layers["Shapes"].properties["box_label"] = np.array(labels)
+
+
+def load_bb_labels_for_image(viewer):
+    logger.info("Loading already existing inference results for image")
+    all_files = viewer.layers["Image"].metadata["all_files"]
+    filename = all_files[viewer.dims.current_step[0]]
+    dirname = os.path.dirname(all_files[0])
+    df = pd.read_csv(os.path.join(dirname, "bb_labels.csv"))
+    # Filter out the df for all the bounding boxes in one image
+    tmp_df = df[df.image_id == filename]
+    shape = viewer.layers["Shapes"]
+    bboxes = shape.data
+    labels = shape.properties["box_label"].tolist()
+    for index, row in tmp_df.iterrows():
+        x1 = row.xmin
+        x2 = row.xmax
+        y1 = row.ymin
+        y2 = row.ymax
+        label = row.label
+        image_id = row.image_id
+        z = all_files.index(image_id)
+        bbox_rect = np.array(
+            [[z, y1, x1], [z, y2, x1], [z, y2, x2], [z, y1, x2]]
+        )
+        bboxes.append(bbox_rect)
+        labels.append(label)
     viewer.layers["Shapes"].data = bboxes
     viewer.layers["Shapes"].properties["box_label"] = np.array(labels)
 
 
 @Viewer.bind_key('Shift-i')
-def run_inference_on_images(viewer):
+def run_inference_on_image(viewer):
     logger.info("Pressed key Shift-i")
     image_layer = viewer.layers["Image"]
-    all_files = image_layer.metadata["all_files"]
-    filename = all_files[0]
+    metadata = image_layer.metadata
+    all_files = metadata["all_files"]
+    filename = all_files[viewer.dims.current_step[0]]
     dirname = os.path.dirname(filename)
-
     box_annotations = image_layer.metadata["box_annotations"]
     model = image_layer.metadata["model"]
-    use_tpu = image_layer.metadata["edgetpu"]
 
-    labels_txt = os.path.join(dirname, "labels.txt")
-    with open(labels_txt, 'w') as f:
-        for index, label in enumerate(box_annotations):
-            f.write("{} {}\n".format(index, label))
-
-    format_of_files = os.path.splitext(filename)[1]
-    if model.endswith(".tflite"):
-        detect_images(
-            model, use_tpu, dirname, format_of_files,
-            labels_txt, DEFAULT_CONFIDENCE, dirname,
-            DEFAULT_INFERENCE_COUNT, False)
+    basename = os.path.basename(filename)
+    save_overlay_path = metadata["save_overlay_path"]
+    overlaid_save_name = os.path.join(
+        save_overlay_path,
+        "pred_{}".format(basename)
+    )
+    if os.path.exists(overlaid_save_name):
+        logger.info("Inference already ran on this image, calling load annotations instead")
+        load_bb_labels_for_image(viewer)
     else:
+
+        labels_txt = os.path.join(dirname, "labels.txt")
+        with open(labels_txt, 'w') as f:
+            for index, label in enumerate(box_annotations):
+                f.write("{} {}\n".format(index, label))
         csv_path = os.path.join(dirname, "bb_labels.csv")
+        # To not overwrite the existing csv, and lose the predictions per image
+        # from last image
+        if os.path.exists(csv_path):
+            df = pd.read_csv(csv_path)
+        else:
+            df = pd.DataFrame(columns=LUMI_CSV_COLUMNS)
+        csv_path_per_image = os.path.join(
+            dirname, "bb_labels_{}.csv".format(os.path.basename(filename)))
         subprocess.check_call(
-            'lumi predict {} --checkpoint {} -f {}'.format(
-                dirname, model, csv_path), shell=True)
-        logger.info("subprocess call completed ")
+            'lumi predict {} --checkpoint {} -f {} --save_media_to {}'.format(
+                filename, model, csv_path_per_image, ), shell=True)
+        os.remove(csv_path_per_image)
+        frames = [df, pd.read_csv(csv_path_per_image)]
+        result_df = pd.concat(frames)
+        result_df.to_csv(csv_path)
+        logger.info("lumi prediction per image subprocess call completed ")
 
 
 def update_layers(viewer, box_annotations):

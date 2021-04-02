@@ -3,7 +3,7 @@ from ._key_bindings import (
     update_layers,
     save_bb_labels,
     load_bb_labels,
-    run_inference_on_images)
+    run_inference_on_image)
 from napari_bb_annotations.constants_lumi import BOX_ANNOTATIONS
 
 
@@ -28,8 +28,8 @@ def connect_to_viewer(viewer):
     load_gui_btn = QPushButton("load annotations [shift + l]")
     load_gui_btn.clicked.connect(lambda: load_bb_labels(viewer))
 
-    run_inference_btn = QPushButton("Run inference [shift + i]")
-    run_inference_btn.clicked.connect(lambda: run_inference_on_images(viewer))
+    run_inference_btn = QPushButton("Predict bounding box, labels in image using tensorflow [shift + i]")
+    run_inference_btn.clicked.connect(lambda: run_inference_on_image(viewer))
 
     viewer.window.add_dock_widget(
         [update_gui_btn, save_gui_btn, load_gui_btn, run_inference_btn],
