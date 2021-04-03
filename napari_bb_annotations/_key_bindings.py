@@ -23,24 +23,6 @@ logging.basicConfig(
 )
 
 
-def run_shell_cmd(cmd, fail_ok=False):
-    logger.info('running: {}'.format(cmd))
-    proc = subprocess.Popen(
-        cmd, shell=True, stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE)
-    (out, err) = proc.communicate()
-
-    out = out.decode('utf-8')
-    err = err.decode('utf-8')
-
-    if proc.returncode != 0 and not fail_ok:
-        logger.info('out: {}'.format(out))
-        logger.info('err: {}'.format(err))
-        raise AssertionError("exit code is non zero: %d" % proc.returncode)
-
-    return (proc.returncode, out, err)
-
-
 def check_bbox(bbox, width, height):
     xmin, ymin, xmax, ymax = bbox[0], bbox[1], bbox[2], bbox[3]
     if xmin > width:
@@ -272,13 +254,12 @@ def save_bb_labels(viewer):
 
 def load_bb_labels(viewer):
     logger.info("Pressed load bounding box, labels button")
-    if set(viewer.layers["Image"].metadata["loaded"]) == {True}:
+    if viewer.layers["Image"].metadata["loaded"]:
         return
     all_files = viewer.layers["Image"].metadata["all_files"]
     dirname = os.path.dirname(all_files[0])
     csv_path = os.path.join(dirname, "bb_labels.csv")
-    index_of_image = viewer.dims.current_step[0]
-    if (not viewer.layers["Image"].metadata["loaded"][index_of_image] and os.path.exists(csv_path)):
+    if os.path.exists(csv_path):
         df = pd.read_csv(csv_path)
         shape = viewer.layers["Shapes"]
         bboxes = shape.data
@@ -296,84 +277,28 @@ def load_bb_labels(viewer):
             )
             bboxes.append(bbox_rect)
             labels.append(label)
-            index_of_image = all_files.index(image_id)
-            viewer.layers["Image"].metadata["loaded"][index_of_image] = True
-            viewer.layers["Image"].metadata["inferenced"][index_of_image] = True
         viewer.layers["Shapes"].data = bboxes
+        viewer.layers["Image"].metadata["loaded"] = True
         viewer.layers["Shapes"].properties["box_label"] = np.array(labels)
-    update_layers(viewer)
 
 
-def load_bb_labels_for_image(viewer):
-    logger.info("Loading existing inference results for image")
-    all_files = viewer.layers["Image"].metadata["all_files"]
-    index_of_image = viewer.dims.current_step[0]
-    filename = all_files[index_of_image]
-    dirname = os.path.dirname(all_files[0])
-    df = pd.read_csv(os.path.join(dirname, "bb_labels.csv"))
-    # Filter out the df for all the bounding boxes in one image
-    tmp_df = df[df.image_id == filename]
-    shape = viewer.layers["Shapes"]
-    bboxes = shape.data
-    labels = shape.properties["box_label"].tolist()
-    for index, row in tmp_df.iterrows():
-        x1 = row.xmin
-        x2 = row.xmax
-        y1 = row.ymin
-        y2 = row.ymax
-        label = row.label
-        image_id = row.image_id
-        z = all_files.index(image_id)
-        bbox_rect = np.array(
-            [[z, y1, x1], [z, y2, x1], [z, y2, x2], [z, y1, x2]]
-        )
-        bboxes.append(bbox_rect)
-        labels.append(label)
-    logger.info("labels are {}".format(labels))
-    viewer.layers["Shapes"].data = bboxes
-    viewer.layers["Shapes"].properties["box_label"] = np.array(labels)
-    viewer.layers["Image"].metadata["loaded"][index_of_image] = True
-
-
-def run_inference_on_image(viewer):
-    logger.info("Pressed button to run inference/prediction")
+def run_inference_on_images(viewer):
+    logger.info("Pressed button for running prediction")
+    if viewer.layers["Image"].metadata["inferenced"]:
+        return
     image_layer = viewer.layers["Image"]
-    metadata = image_layer.metadata
-    all_files = metadata["all_files"]
-    index_of_image = viewer.dims.current_step[0]
-    filename = all_files[index_of_image]
+    all_files = image_layer.metadata["all_files"]
+    filename = all_files[0]
     dirname = os.path.dirname(filename)
+
     model = image_layer.metadata["model"]
 
-    save_overlay_path = metadata["save_overlay_path"]
     csv_path = os.path.join(dirname, "bb_labels.csv")
-
-    if not viewer.layers["Image"].metadata["inferenced"][index_of_image]:
-        # To not overwrite the existing csv, and lose the predictions per image
-        # from last image
-        if os.path.exists(csv_path):
-            df = pd.read_csv(csv_path)
-        else:
-            df = pd.DataFrame(columns=LUMI_CSV_COLUMNS)
-        csv_path_per_image = os.path.join(
-            dirname, "bb_labels_{}.csv".format(os.path.basename(filename)))
-        run_shell_cmd(
-            'lumi predict ' + '"{}"'.format(filename) +
-            ' --checkpoint ' + model +
-            ' -f ' + '"{}"'.format(csv_path_per_image) +
-            ' --save-media-to ' + save_overlay_path)
-        if os.path.exists(csv_path_per_image):
-            frames = [df, pd.read_csv(csv_path_per_image)]
-            os.remove(csv_path_per_image)
-            result_df = pd.concat(frames)
-            result_df.to_csv(csv_path)
-            logger.info("lumi prediction per image subprocess call completed ")
-            viewer.layers["Image"].metadata["inferenced"][index_of_image] = True
-        else:
-            logger.info("Prediction unsuccesful")
-        load_bb_labels_for_image(viewer)
-    else:
-        load_bb_labels_for_image(viewer)
+    subprocess.check_call(
+        'lumi predict {} --checkpoint {} -f {}'.format(
+            dirname, model, csv_path), shell=True)
+    viewer.layers["Image"].metadata["inferenced"] = True
+    logger.info("subprocess call completed ")
 
 
 def update_layers(viewer):

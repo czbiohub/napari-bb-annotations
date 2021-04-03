@@ -99,9 +99,9 @@ def reader_function(path):
         "all_files": all_files,
         "box_annotations": BOX_ANNOTATIONS,
         "new_labels": [],
-        "loaded": [False] * num_files,
+        "loaded": False,
         "updated": False,
-        "inferenced": [False] * num_files,
+        "inferenced": False,
         "model": MODEL,
         "edgetpu": EDGETPU},
         "name": "Image"}
