@@ -23,7 +23,7 @@ conda env create -n napari-bb-annotations-release -f environment.yml
 conda activate napari-bb-annotations-release
 ${RELEASE_ENV}/bin/python setup.py install
 conda install -y pyqt
-pip install git+https://github.com/napari/napari.git@3188e86950d04ad6444cf620101922ad822d9dd6
+pip install git+https://github.com/napari/napari.git@309de05c86d1e0668198e3d4d195624defa4d894
 git clone https://github.com/czbiohub/luminoth-uv-imaging.git
 cd luminoth-uv-imaging
 ${RELEASE_ENV}/bin/python setup.py install

@@ -126,6 +126,7 @@ def create_label_menu(shapes_layer, image_layer):
         """This is a callback function that updates the label menu when
         the current properties of the Shapes layer change
         """
+        logger.info("Label menu update event on current properties change has been called")
         new_label = str(shapes_layer.current_properties[label_property][0])
         if new_label != label_menu.value and new_label in BOX_ANNOTATIONS:
             label_menu.value = new_label
@@ -140,6 +141,7 @@ def create_label_menu(shapes_layer, image_layer):
         """This is a callback that update the current properties on the Shapes layer
         when the label menu selection changes
         """
+        logger.info("Shapes layer current_properties update event on label menu change has been called")
         selected_label = event.value
         current_properties = shapes_layer.current_properties
         current_properties[label_property] = np.asarray([selected_label])
@@ -166,6 +168,7 @@ def update_summary_table(shapes_layer, image_layer):
         the current properties of the Shapes layer change or when you are
         moving to next image or at the end of stack
         """
+        logger.info("Summary table update event on current properties change has been called")
         new_label = str(shapes_layer.current_properties[label_property][0])
         if new_label != label_menu.value:
             box_labels = shapes_layer.properties["box_label"].tolist()
@@ -181,8 +184,11 @@ def update_summary_table(shapes_layer, image_layer):
                     "columns": ("c"),
                 }
             else:
+                box_labels = shapes_layer.properties["box_label"].tolist()
                 unique_labels = np.unique(
                     shapes_layer.properties['box_label']).tolist()
+                logger.info("unique labels are {}".format(unique_labels))
+                logger.info("box labels are {}".format(box_labels))
                 data = [[box_labels.count(label)] for label in unique_labels]
                 split_dict = {
                     "data": data,
@@ -194,8 +200,11 @@ def update_summary_table(shapes_layer, image_layer):
         update_table_on_label_change)
 
     def update_table_on_coordinates_change(event):
+        logger.info("Summary table update event on coordinates change has been called")
         box_labels = shapes_layer.properties["box_label"].tolist()
         data = [[box_labels.count(label)] for label in BOX_ANNOTATIONS]
+        logger.info("box_labels are {}".format(box_labels))
+        logger.info("data is {}".format(data))
         split_dict = {
             "data": data,
             "index": tuple(BOX_ANNOTATIONS),
@@ -267,7 +276,7 @@ def save_bb_labels(viewer):
 
             image_at_index.save(overlaid_save_name)
     logger.info("csv path is {}".format(csv_path))
-    df.to_csv(csv_path)
+    df.to_csv(csv_path, index=False)
 
 
 def load_bb_labels(viewer):
@@ -279,7 +288,7 @@ def load_bb_labels(viewer):
     csv_path = os.path.join(dirname, "bb_labels.csv")
     index_of_image = viewer.dims.current_step[0]
     if (not viewer.layers["Image"].metadata["loaded"][index_of_image] and os.path.exists(csv_path)):
-        df = pd.read_csv(csv_path)
+        df = pd.read_csv(csv_path, index_col=False)
         shape = viewer.layers["Shapes"]
         bboxes = shape.data
         labels = shape.properties["box_label"].tolist()
@@ -299,18 +308,21 @@ def load_bb_labels(viewer):
             index_of_image = all_files.index(image_id)
             viewer.layers["Image"].metadata["loaded"][index_of_image] = True
             viewer.layers["Image"].metadata["inferenced"][index_of_image] = True
-        viewer.layers["Shapes"].data = bboxes
-        viewer.layers["Shapes"].properties["box_label"] = np.array(labels)
-    update_layers(viewer)
+        # remove all shapes from layer
+        shapes_layer = viewer.layers["Shapes"]
+        shapes_layer.selected_data = set(range(shapes_layer.nshapes))
+        shapes_layer.remove_selected()
+        shapes_layer.data = bboxes
+        shapes_layer.properties["box_label"] = np.array(labels)
 
 
 def load_bb_labels_for_image(viewer):
-    logger.info("Loading existing inference results for image")
+    logger.info("Loading inference results for image")
     all_files = viewer.layers["Image"].metadata["all_files"]
     index_of_image = viewer.dims.current_step[0]
     filename = all_files[index_of_image]
     dirname = os.path.dirname(all_files[0])
-    df = pd.read_csv(os.path.join(dirname, "bb_labels.csv"))
+    df = pd.read_csv(os.path.join(dirname, "bb_labels.csv"), index_col=False)
     # Filter out the df for all the bounding boxes in one image
     tmp_df = df[df.image_id == filename]
     shape = viewer.layers["Shapes"]
@@ -330,9 +342,12 @@ def load_bb_labels_for_image(viewer):
         bboxes.append(bbox_rect)
         labels.append(label)
     logger.info("labels are {}".format(labels))
-    viewer.layers["Shapes"].data = bboxes
-    viewer.layers["Shapes"].properties["box_label"] = np.array(labels)
-    viewer.layers["Image"].metadata["loaded"][index_of_image] = True
+    # remove all shapes from layer
+    shapes_layer = viewer.layers["Shapes"]
+    shapes_layer.selected_data = set(range(shapes_layer.nshapes))
+    shapes_layer.remove_selected()
+    shapes_layer.data = bboxes
+    shapes_layer.properties["box_label"] = np.array(labels)
 
 
 def run_inference_on_image(viewer):
@@ -352,7 +367,7 @@ def run_inference_on_image(viewer):
         # To not overwrite the existing csv, and lose the predictions per image
         # from last image
         if os.path.exists(csv_path):
-            df = pd.read_csv(csv_path)
+            df = pd.read_csv(csv_path, index_col=False)
         else:
             df = pd.DataFrame(columns=LUMI_CSV_COLUMNS)
         csv_path_per_image = os.path.join(
@@ -363,10 +378,10 @@ def run_inference_on_image(viewer):
             ' -f ' + '"{}"'.format(csv_path_per_image) +
             ' --save-media-to ' + save_overlay_path)
         if os.path.exists(csv_path_per_image):
-            frames = [df, pd.read_csv(csv_path_per_image)]
+            frames = [df, pd.read_csv(csv_path_per_image, index_col=False)]
             os.remove(csv_path_per_image)
-            result_df = pd.concat(frames)
-            result_df.to_csv(csv_path)
+            result_df = pd.concat(frames, ignore_index=True)
+            result_df.to_csv(csv_path, index=False)
             logger.info("lumi prediction per image subprocess call completed ")
             viewer.layers["Image"].metadata["inferenced"][index_of_image] = True
         else:
@@ -378,27 +393,11 @@ def run_inference_on_image(viewer):
 
 def update_layers(viewer):
     logger.info("Updating layers")
-    if viewer.layers["Image"].metadata["updated"]:
-        return
     shapes_layer = viewer.layers['Shapes']
     image_layer = viewer.layers['Image']
     shapes_layer.mode = 'add_rectangle'
 
     label_widget = create_label_menu(shapes_layer, image_layer)
-    text_property = "box_label"
-    text_color = 'green'
-    text_size = 8
-
-    # this is a hack to get around a bug we currently have
-    # for creating emtpy layers with text
-    # see: https://github.com/napari/napari/issues/2115
-
-    def on_data(event):
-        if shapes_layer.text.mode == 'none':
-            shapes_layer.text = text_property
-            shapes_layer.text.color = text_color
-            shapes_layer.text.size = text_size
-    shapes_layer.events.set_data.connect(on_data)
     # add the label selection gui to the viewer as a dock widget
     viewer.window.add_dock_widget(label_widget, area='right')
     table_widget = update_summary_table(
@@ -408,7 +407,6 @@ def update_layers(viewer):
     table_widget.min_height = 400
     table_widget.max_width = 300
     table_widget.max_height = 400
-    viewer.layers["Image"].metadata["updated"] = True
     viewer.window.add_dock_widget(table_widget, area='right')
 
 

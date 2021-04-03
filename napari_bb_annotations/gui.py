@@ -3,7 +3,8 @@ from ._key_bindings import (
     save_bb_labels,
     load_bb_labels,
     run_inference_on_image,
-    edit_bb_labels)
+    edit_bb_labels,
+    update_layers)
 
 
 def connect_to_viewer(viewer):
@@ -17,10 +18,15 @@ def connect_to_viewer(viewer):
         # Check console has been created when it is supposed to be shown
         view.toggle_console_visibility(None)
 
+    update_gui_btn = QPushButton(
+        "Update layers, only click once per stack")
+    update_gui_btn.clicked.connect(
+        lambda: update_layers(viewer))
+
     save_gui_btn = QPushButton("Save annotations")
     save_gui_btn.clicked.connect(lambda: save_bb_labels(viewer))
 
-    load_gui_btn = QPushButton("Load annotations if existing, label menu")
+    load_gui_btn = QPushButton("Load annotations if existing, summary table")
     load_gui_btn.clicked.connect(lambda: load_bb_labels(viewer))
 
     run_inference_btn = QPushButton("Predict bounding box, labels in 1 image using tensorflow")
@@ -30,7 +36,7 @@ def connect_to_viewer(viewer):
     edit_bb_label_btn.clicked.connect(lambda: edit_bb_labels(viewer))
 
     viewer.window.add_dock_widget(
-        [save_gui_btn, load_gui_btn,
+        [update_gui_btn, save_gui_btn, load_gui_btn,
          run_inference_btn, edit_bb_label_btn],
         area="right",
         allowed_areas=["right", "left"],

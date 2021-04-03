@@ -100,15 +100,19 @@ def reader_function(path):
         "box_annotations": BOX_ANNOTATIONS,
         "new_labels": [],
         "loaded": [False] * num_files,
-        "updated": False,
         "inferenced": [False] * num_files,
         "model": MODEL,
         "edgetpu": EDGETPU},
         "name": "Image"}
 
+    text_kwargs = {
+        'text': 'box_label',
+        'size': 8,
+        'color': 'green'
+    }
     add_kwargs = dict(
         face_color="black", properties={"box_label": BOX_ANNOTATIONS}, ndim=3,
-        text="box_label", name="Shapes", edge_color="black", opacity=0.5)
+        text=text_kwargs, name="Shapes", edge_color="black", opacity=0.4)
     layer_list = [
         (stack, metadata, layer_type),
         (None, add_kwargs, "shapes")]
