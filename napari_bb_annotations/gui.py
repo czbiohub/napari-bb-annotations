@@ -1,10 +1,9 @@
 from qtpy.QtWidgets import QPushButton
 from ._key_bindings import (
-    update_layers,
     save_bb_labels,
     load_bb_labels,
-    run_inference_on_image)
-from napari_bb_annotations.constants_lumi import BOX_ANNOTATIONS
+    run_inference_on_image,
+    edit_bb_labels)
 
 
 def connect_to_viewer(viewer):
@@ -17,22 +16,22 @@ def connect_to_viewer(viewer):
     if view._console is not None:
         # Check console has been created when it is supposed to be shown
         view.toggle_console_visibility(None)
-    update_gui_btn = QPushButton(
-        "Update layers, only click once per stack")
-    update_gui_btn.clicked.connect(
-        lambda: update_layers(viewer, BOX_ANNOTATIONS))
 
-    save_gui_btn = QPushButton("save annotations [shift + s]")
+    save_gui_btn = QPushButton("Save annotations")
     save_gui_btn.clicked.connect(lambda: save_bb_labels(viewer))
 
-    load_gui_btn = QPushButton("load annotations [shift + l]")
+    load_gui_btn = QPushButton("Load annotations if existing, label menu")
     load_gui_btn.clicked.connect(lambda: load_bb_labels(viewer))
 
-    run_inference_btn = QPushButton("Predict bounding box, labels in image using tensorflow [shift + i]")
+    run_inference_btn = QPushButton("Predict bounding box, labels in 1 image using tensorflow")
     run_inference_btn.clicked.connect(lambda: run_inference_on_image(viewer))
 
+    edit_bb_label_btn = QPushButton("Edit label for bounding box")
+    edit_bb_label_btn.clicked.connect(lambda: edit_bb_labels(viewer))
+
     viewer.window.add_dock_widget(
-        [update_gui_btn, save_gui_btn, load_gui_btn, run_inference_btn],
+        [save_gui_btn, load_gui_btn,
+         run_inference_btn, edit_bb_label_btn],
         area="right",
         allowed_areas=["right", "left"],
     )

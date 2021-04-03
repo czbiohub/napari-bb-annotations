@@ -93,10 +93,15 @@ def reader_function(path):
         stack[i] = imread(all_files[i])
 
     layer_type = "image"  # optional, default is "image"
+    num_files = len(all_files)
     metadata = {'metadata': {
-        "save_overlay_path": path,
+        "save_overlay_path": save_overlay_path,
         "all_files": all_files,
         "box_annotations": BOX_ANNOTATIONS,
+        "new_labels": [],
+        "loaded": [False] * num_files,
+        "updated": False,
+        "inferenced": [False] * num_files,
         "model": MODEL,
         "edgetpu": EDGETPU},
         "name": "Image"}
