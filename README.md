@@ -29,51 +29,23 @@ You can install `napari-bb-annotations` via [pip]:
     conda env create -n napari-bb-annotations -f environment.yml
     conda activate napari-bb-annotations
     python setup.py install
-    python napari_bb_annotations/launcher/bb_annotations.py \
-        --path ./data/jpgstoannotated/ \
-		--format_of_files .jpg \
-		--box_annotations class1 class2 class3 `
 
-Or
+Deploy the app using `./dev/deployment/osx/make-release.sh` if a .app package was not provided to you, otherwise on 
+MacOS, download the .app file and double click on it
 
-MacOS: download the .app file or deploy the app file using `./dev/deployment/osx/make-release.sh` and then right click on the .app file created and get the path to app as below and provide the arguments to your path, format_of_files, box_annotations
-
-`/Users/pranathi.vemuri/Downloads/napari-he-annotations_0.0.1.app/Contents/MacOS/bb_annotations --path ./data/jpgstoannotated/ --format_of_files .jpg --box_annotations class1 class2 class3 `
-
-If you have a tflite model and its edgetpu compatible and you want to run inference and load those annotations, correct them use the below command
-
-`/Users/pranathi.vemuri/Downloads/napari-he-annotations_0.0.1.app/Contents/MacOS/bb_annotations --path ./data/jpgstoannotated/ --format_of_files .jpg --box_annotations class1 class2 class3 --model ./czbiohub/ulc-malaria-scope/models/output_tflite_graph.tflite --edgetpu`
-
-If you have a tflite model and its not edgetpu compatible, do not give the `--edgetpu` flag and you want to run inference and load those annotations, correct them use the below command
-
-`/Users/pranathi.vemuri/Downloads/napari-he-annotations_0.0.1.app/Contents/MacOS/bb_annotations --path ./data/jpgstoannotated/ --format_of_files .jpg --box_annotations class1 class2 class3 --model ./czbiohub/ulc-malaria-scope/models/output_tflite_graph.tflite`
-
-If you were given a .bz2 file, double-click to extract the .app file from the archive. Right-click the .app file and get the path to the app by clicking on `Get info` and provide the arguments to your path, format_of_files, box_annotations, as above
+If you were given a .bz2 file, double-click to extract the .app file from the archive, double click again
 
 
 Once the app opens up, 
-1. Enter the path of your folder containing `images` or `video` subfolders into the file dialog like so using flags `--path /Users/pranathi.vemuri/napari-bb-annotations/data/`, `--format_of_files .jpg` and `box_annotations class1 class2 class3 class4 `
-2. If you are opening the app using cli and have already given paths, please click the cancel button when it asks for path, box_annotations, and format_of_files again
-3. Click the `Shift-l` key or load annotations button if you have a csv annotations that was saved previously you can reload it. Ignore this step if you do not have the annotations previously saved as well as press this only once per stack. Once you click load the bounding boxes are updated but not the label yet, Step 6 actually enables the correct labels, i.e click `Update layers` after load if you have previous annotations, otherwise just press `Update layers`
+1. Drag and drop the images folder
+2. Click `Tensorflow Predict ALL images` to predict. Currently the app is set to predict on this branch using a luminoth [checkpoint](https://github.com/czbiohub/luminoth-uv-imaging/releases) these 6 classes "Culex erythrothorax","Culex tarsalis", "Culiseta inornata", "Debris", "Insect", "Mosquito" 
+3. Click `Tensorflow Predict ONLY CURRENT image` to predict the current image only as each image can take upto 10-20 seconds to predict. If you predict a whole folder of 100 images, be patient and wait upto 30 minutes
+3. Click the `Load annotations` button if you have a bb_labels.csv annotations that was saved previously you can reload it. 
 4. Note to correct both bounding box and the label, use select on top left  to select the bounding box or bounding boxes you want to change the label of and change the label in drop down menu on bottom right
+5. If you want to edit or add a new bounding box use `Edit label for bounding box` button after `Select shapes` and update with the new name on the bounding box pop up on the left and close it afterwards using the `x` that says `hide the panel`
 5. Click the `Select shapes` button to delete the selected box and label using `x` symbol on the left among different arrows for the shape layer
-6. Click `Update layers` button only once per stack to see the dock with the `box_annotations` 
-7. Click `Shift-s` to save the bounding boxes, classes along with the image path to `bb_labels.csv` or bounding boxes, labels overlaid image, you can click `s` any number of times as you progress, the overlay directory is created inside the path with the name `overlay_dir`
+7. Click `Save annotations`, classes along with the image path to `bb_labels.csv` or bounding boxes, labels overlaid image, you can click `s` any number of times as you progress, the overlay directory is created inside the path with the name `overlay_dir`
 8. Write frame number near the frame slider to skip to a slide, otherwise clicking the slider right and left arrows will make you switch before different frames
-9. To run inference, give the inputs of model i.e the path to tflite file, edgetpu flag (set it if you have a coral connected) - The model will use tflite_runtime to infer/predict the bounding boxes, labels when you click `run inference ` button and to load those annotations click `load annotations`. Running inference should be the first steps if you want to figure out bounding boxes, labels and correct them
-
-To use inferencing, install tflite_runtime for mac with 3.5 as below, to figure out a different wheel based on your platform go here - https://github.com/google-coral/pycoral/releases/
-
-`pip install https://dl.google.com/coral/python/tflite_runtime-2.1.0.post1-cp37-cp37m-macosx_10_14_x86_64.whl`
-
-To install edgetpu dependencies alongside the tflite_runtime
-
-`curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
-echo "deb https://packages.cloud.google.com/apt coral-edgetpu-stable main" | sudo tee /etc/apt/sources.list.d/coral-edgetpu.list
-sudo apt update
-sudo apt-get install edgetpu-compiler`
-
-
 
 ## Contributing
 
