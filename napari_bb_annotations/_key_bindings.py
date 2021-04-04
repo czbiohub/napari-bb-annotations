@@ -3,12 +3,18 @@ import logging
 import os
 import pickle
 import subprocess
+from typing import List
 
 import numpy as np
 import pandas as pd
 from magicgui.widgets import ComboBox, Container, Table
 from PIL import Image, ImageDraw
 from .constants_lumi import BOX_ANNOTATIONS, LUMI_CSV_COLUMNS
+from napari.utils.notifications import (
+    Notification,
+    notification_manager,
+    show_info,
+)
 
 
 def pickle_save(path, metadata_dct):
@@ -219,6 +225,12 @@ def update_summary_table(shapes_layer, image_layer):
 
 def save_bb_labels(viewer):
     logger.info("Pressed save bounding boxes, labels button")
+    with notification_manager:
+        # save all of the events that get emitted
+        store: List[Notification] = []
+        _append = lambda e: store.append(e)  # lambda needed on py3.7  # noqa
+        notification_manager.notification_ready.connect(_append)
+        show_info('Pressed save bounding boxes, labels button')
     shape = viewer.layers["Shapes"]
     image = viewer.layers["Image"]
     metadata = viewer.layers["Image"].metadata
@@ -235,8 +247,6 @@ def save_bb_labels(viewer):
         assert len(z_index) == 1
         z_indices.append(z_index[0])
     z_indices = np.unique(z_indices).tolist()
-    logger.info("z_indices {}".format(z_indices))
-    logger.info("stack.shape {}".format(stack.shape))
     for stack_index in z_indices:
         # visualization image
         image_at_index = stack[int(stack_index)]
@@ -272,15 +282,26 @@ def save_bb_labels(viewer):
                 save_overlay_path,
                 "pred_{}".format(basename)
             )
-            logger.info("saving images to {}".format(overlaid_save_name))
-
             image_at_index.save(overlaid_save_name)
+    with notification_manager:
+        # save all of the events that get emitted
+        store: List[Notification] = []
+        _append = lambda e: store.append(e)  # lambda needed on py3.7  # noqa
+        notification_manager.notification_ready.connect(_append)
+        show_info("csv path and overlaid images path is {}".format(csv_path, save_overlay_path))
     logger.info("csv path is {}".format(csv_path))
     df.to_csv(csv_path)
 
 
 def load_bb_labels(viewer):
     logger.info("Pressed load bounding box, labels button")
+    with notification_manager:
+        # save all of the events that get emitted
+        store: List[Notification] = []
+        _append = lambda e: store.append(e)  # lambda needed on py3.7  # noqa
+        notification_manager.notification_ready.connect(_append)
+
+        show_info('Pressed load bounding box, labels button')
     if viewer.layers["Image"].metadata["loaded"]:
         return
     all_files = viewer.layers["Image"].metadata["all_files"]
@@ -314,6 +335,13 @@ def load_bb_labels(viewer):
 
 def run_inference_on_images(viewer):
     logger.info("Pressed button for running prediction")
+    with notification_manager:
+        # save all of the events that get emitted
+        store: List[Notification] = []
+        _append = lambda e: store.append(e)  # lambda needed on py3.7  # noqa
+        notification_manager.notification_ready.connect(_append)
+
+        show_info('Pressed button for running prediction, takes up to 1s per bounding box')
     image_layer = viewer.layers["Image"]
     all_files = image_layer.metadata["all_files"]
     filename = all_files[0]
@@ -325,7 +353,14 @@ def run_inference_on_images(viewer):
         inference_metadata = pickle_load(inference_metadata_path)
         already_inferenced = inference_metadata["inferenced"]
         if set(already_inferenced) == {True}:
-            logger.info("Already inferenced")
+            with notification_manager:
+                # save all of the events that get emitted
+                store: List[Notification] = []
+                _append = lambda e: store.append(e)  # lambda needed on py3.7  # noqa
+                notification_manager.notification_ready.connect(_append)
+
+                show_info('Already ran prediction, click load')
+            logger.info("Already ran prediction")
     if set(already_inferenced) == {False}:
         model = image_layer.metadata["model"]
 
@@ -461,5 +496,8 @@ def run_inference_on_image(viewer):
             load_bb_labels_for_image(viewer)
         else:
             logger.error("Prediction unsuccesful")
+            e.args += ('Prediction unsuccesful')
+            notif = ErrorNotification(AssertionError)
+            dialog = NapariQtNotification.from_notification(notif)
     else:
         load_bb_labels_for_image(viewer)
