@@ -1,6 +1,7 @@
 import datetime
 import logging
 import os
+import pickle
 import subprocess
 
 import numpy as np
@@ -10,6 +11,32 @@ from PIL import Image, ImageDraw
 from .constants_lumi import BOX_ANNOTATIONS, LUMI_CSV_COLUMNS
 
 
+def pickle_save(path, metadata_dct):
+    with open(path, "wb") as fh:
+        pickle.dump(metadata_dct, fh)
+
+
+def pickle_load(path):
+    with open(path, "rb") as fh:
+        return pickle.load(fh)
+
+
+def run_shell_cmd(cmd, fail_ok=False):
+    logger.info('running: {}'.format(cmd))
+    proc = subprocess.Popen(
+        cmd, shell=True, stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE)
+    (out, err) = proc.communicate()
+
+    out = out.decode('utf-8')
+    err = err.decode('utf-8')
+
+    if proc.returncode != 0 and not fail_ok:
+        logger.info('out: {}'.format(out))
+        logger.info('err: {}'.format(err))
+        raise AssertionError("exit code is non zero: %d" % proc.returncode)
+
+    return (proc.returncode, out, err)
 # create the GUI for selecting the values
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -277,28 +304,40 @@ def load_bb_labels(viewer):
             )
             bboxes.append(bbox_rect)
             labels.append(label)
-        viewer.layers["Shapes"].data = bboxes
+        shapes_layer = viewer.layers["Shapes"]
+        shapes_layer.data = bboxes
         viewer.layers["Image"].metadata["loaded"] = True
-        viewer.layers["Shapes"].properties["box_label"] = np.array(labels)
+        shapes_layer.properties["box_label"] = np.array(labels)
+        shapes_layer.text.refresh_text(shapes_layer.properties)
+    update_layers(viewer)
 
 
 def run_inference_on_images(viewer):
     logger.info("Pressed button for running prediction")
-    if viewer.layers["Image"].metadata["inferenced"]:
-        return
     image_layer = viewer.layers["Image"]
     all_files = image_layer.metadata["all_files"]
     filename = all_files[0]
     dirname = os.path.dirname(filename)
+    inference_metadata_path = os.path.join(
+        dirname, "inference_metadata.pickle")
+    already_inferenced = [False] * len(all_files)
+    if os.path.exists(inference_metadata_path):
+        inference_metadata = pickle_load(inference_metadata_path)
+        already_inferenced = inference_metadata["inferenced"]
+        if set(already_inferenced) == {True}:
+            logger.info("Already inferenced")
+    if set(already_inferenced) == {False}:
+        model = image_layer.metadata["model"]
 
-    model = image_layer.metadata["model"]
-
-    csv_path = os.path.join(dirname, "bb_labels.csv")
-    subprocess.check_call(
-        'lumi predict {} --checkpoint {} -f {}'.format(
-            dirname, model, csv_path), shell=True)
-    viewer.layers["Image"].metadata["inferenced"] = True
-    logger.info("subprocess call completed ")
+        csv_path = os.path.join(dirname, "bb_labels.csv")
+        run_shell_cmd(
+            'lumi predict {} --checkpoint {} -f {}'.format(
+                dirname, model, csv_path))
+        inferenced_list = [True] * len(all_files)
+        viewer.layers["Image"].metadata["inferenced"] = inferenced_list
+        metadata = {"inferenced": inferenced_list}
+        pickle_save(inference_metadata_path, metadata)
+        logger.info("subprocess call completed ")
 
 
 def update_layers(viewer):
@@ -310,20 +349,6 @@ def update_layers(viewer):
     shapes_layer.mode = 'add_rectangle'
 
     label_widget = create_label_menu(shapes_layer, image_layer)
-    text_property = "box_label"
-    text_color = 'green'
-    text_size = 8
-
-    # this is a hack to get around a bug we currently have
-    # for creating emtpy layers with text
-    # see: https://github.com/napari/napari/issues/2115
-
-    def on_data(event):
-        if shapes_layer.text.mode == 'none':
-            shapes_layer.text = text_property
-            shapes_layer.text.color = text_color
-            shapes_layer.text.size = text_size
-    shapes_layer.events.set_data.connect(on_data)
     # add the label selection gui to the viewer as a dock widget
     viewer.window.add_dock_widget(label_widget, area='right')
     table_widget = update_summary_table(
@@ -368,3 +393,73 @@ def edit_bb_labels(viewer):
     table_widget.native.itemChanged.connect(on_item_changed)
 
     viewer.window.add_dock_widget(table_widget, area='left')
+
+
+def load_bb_labels_for_image(viewer):
+    logger.info("Loading inference results for image")
+    all_files = viewer.layers["Image"].metadata["all_files"]
+    index_of_image = viewer.dims.current_step[0]
+    filename = all_files[index_of_image]
+    dirname = os.path.dirname(all_files[0])
+    df = pd.read_csv(os.path.join(dirname, "bb_labels.csv"), index_col=False)
+    # Filter out the df for all the bounding boxes in one image
+    tmp_df = df[df.image_id == filename]
+    shape = viewer.layers["Shapes"]
+    bboxes = shape.data
+    labels = shape.properties["box_label"].tolist()
+    for index, row in tmp_df.iterrows():
+        x1 = row.xmin
+        x2 = row.xmax
+        y1 = row.ymin
+        y2 = row.ymax
+        label = row.label
+        image_id = row.image_id
+        z = all_files.index(image_id)
+        bbox_rect = np.array(
+            [[z, y1, x1], [z, y2, x1], [z, y2, x2], [z, y1, x2]]
+        )
+        bboxes.append(bbox_rect)
+        labels.append(label)
+    shapes_layer = viewer.layers["Shapes"]
+    shapes_layer.data = bboxes
+    shapes_layer.properties["box_label"] = np.array(labels)
+    shapes_layer.text.refresh_text(shapes_layer.properties)
+
+
+def run_inference_on_image(viewer):
+    logger.info("Pressed button to run inference/prediction")
+    image_layer = viewer.layers["Image"]
+    metadata = image_layer.metadata
+    all_files = metadata["all_files"]
+    index_of_image = viewer.dims.current_step[0]
+    filename = all_files[index_of_image]
+    dirname = os.path.dirname(filename)
+    model = image_layer.metadata["model"]
+
+    csv_path = os.path.join(dirname, "bb_labels.csv")
+
+    if not viewer.layers["Image"].metadata["inferenced"][index_of_image]:
+        # To not overwrite the existing csv, and lose the predictions per image
+        # from last image
+        if os.path.exists(csv_path):
+            df = pd.read_csv(csv_path, index_col=False)
+        else:
+            df = pd.DataFrame(columns=LUMI_CSV_COLUMNS)
+        csv_path_per_image = os.path.join(
+            dirname, "bb_labels_{}.csv".format(os.path.basename(filename)))
+        run_shell_cmd(
+            'lumi predict ' + '"{}"'.format(filename) +
+            ' --checkpoint ' + model +
+            ' -f ' + '"{}"'.format(csv_path_per_image))
+        if os.path.exists(csv_path_per_image):
+            frames = [df, pd.read_csv(csv_path_per_image, index_col=False)]
+            os.remove(csv_path_per_image)
+            result_df = pd.concat(frames, ignore_index=True)
+            result_df.to_csv(csv_path, index=False)
+            logger.info("lumi prediction per image subprocess call completed ")
+            viewer.layers["Image"].metadata["inferenced"][index_of_image] = True
+            load_bb_labels_for_image(viewer)
+        else:
+            logger.error("Prediction unsuccesful")
+    else:
+        load_bb_labels_for_image(viewer)
