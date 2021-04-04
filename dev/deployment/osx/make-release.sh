@@ -1,7 +1,7 @@
 set -e
 set -x
 
-RELEASE_VERSION=0.0.2
+RELEASE_VERSION=0.0.3
 
 echo "Creating app bundle for napari-bb-annotations ${RELEASE_VERSION}"
 
@@ -23,7 +23,7 @@ conda env create -n napari-bb-annotations-release -f environment.yml
 conda activate napari-bb-annotations-release
 ${RELEASE_ENV}/bin/python setup.py install
 conda install -y pyqt
-pip install git+https://github.com/napari/napari.git@3188e86950d04ad6444cf620101922ad822d9dd6
+pip install git+https://github.com/napari/napari.git@866848d35d039c098b45e8d6f12eae0924633347 # master - Tested for only until April 4th 
 git clone https://github.com/czbiohub/luminoth-uv-imaging.git
 cd luminoth-uv-imaging
 ${RELEASE_ENV}/bin/python setup.py install

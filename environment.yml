@@ -41,4 +41,4 @@ dependencies:
   - typing_extensions
   - pip:
     - tensorflow==1.13.2
-    - git+git://github.com/napari/napari.git@3188e86950d04ad6444cf620101922ad822d9dd6 # master - only until Kevin's commit to fix tests, other recent commits introduce bugs
+    - git+git://github.com/napari/napari.git@866848d35d039c098b45e8d6f12eae0924633347 # master - Tested for only until April 4th commit of master

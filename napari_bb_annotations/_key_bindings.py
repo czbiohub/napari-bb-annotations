@@ -209,11 +209,13 @@ def update_summary_table(shapes_layer, image_layer):
         update_table_on_label_change)
 
     def update_table_on_coordinates_change(event):
+        unique_labels = np.unique(
+            shapes_layer.properties['box_label']).tolist()
         box_labels = shapes_layer.properties["box_label"].tolist()
-        data = [[box_labels.count(label)] for label in BOX_ANNOTATIONS]
+        data = [[box_labels.count(label)] for label in unique_labels]
         split_dict = {
             "data": data,
-            "index": tuple(BOX_ANNOTATIONS),
+            "index": tuple(unique_labels),
             "columns": ("c"),
         }
         table_widget.value = split_dict
