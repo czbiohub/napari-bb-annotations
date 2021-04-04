@@ -38,15 +38,15 @@ Or
 
 MacOS: download the .app file or deploy the app file using `./dev/deployment/osx/make-release.sh` and then right click on the .app file created and get the path to app as below and provide the arguments to your path, format_of_files, box_annotations
 
-`/Users/pranathi.vemuri/Downloads/napari-he-annotations_0.0.1.app/Contents/MacOS/bb_annotations --path ./data/jpgstoannotated/ --format_of_files .jpg --box_annotations class1 class2 class3 `
+`/Users/pranathi.vemuri/Downloads/napari-bb-annotations_0.0.1.app/Contents/MacOS/bb_annotations --path ./data/jpgstoannotated/ --format_of_files .jpg --box_annotations class1 class2 class3 `
 
 If you have a tflite model and its edgetpu compatible and you want to run inference and load those annotations, correct them use the below command
 
-`/Users/pranathi.vemuri/Downloads/napari-he-annotations_0.0.1.app/Contents/MacOS/bb_annotations --path ./data/jpgstoannotated/ --format_of_files .jpg --box_annotations class1 class2 class3 --model ./czbiohub/ulc-malaria-scope/models/output_tflite_graph.tflite --edgetpu`
+`/Users/pranathi.vemuri/Downloads/napari-bb-annotations_0.0.1.app/Contents/MacOS/bb_annotations --path ./data/jpgstoannotated/ --format_of_files .jpg --box_annotations class1 class2 class3 --model ./czbiohub/ulc-malaria-scope/models/output_tflite_graph.tflite --edgetpu`
 
 If you have a tflite model and its not edgetpu compatible, do not give the `--edgetpu` flag and you want to run inference and load those annotations, correct them use the below command
 
-`/Users/pranathi.vemuri/Downloads/napari-he-annotations_0.0.1.app/Contents/MacOS/bb_annotations --path ./data/jpgstoannotated/ --format_of_files .jpg --box_annotations class1 class2 class3 --model ./czbiohub/ulc-malaria-scope/models/output_tflite_graph.tflite`
+`/Users/pranathi.vemuri/Downloads/napari-bb-annotations_0.0.1.app/Contents/MacOS/bb_annotations --path ./data/jpgstoannotated/ --format_of_files .jpg --box_annotations class1 class2 class3 --model ./czbiohub/ulc-malaria-scope/models/output_tflite_graph.tflite`
 
 If you were given a .bz2 file, double-click to extract the .app file from the archive. Right-click the .app file and get the path to the app by clicking on `Get info` and provide the arguments to your path, format_of_files, box_annotations, as above
 
