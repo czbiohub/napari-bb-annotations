@@ -58,7 +58,7 @@ print(OPTIONS, REPO, APP)
 setup(
     app=APP,
     options={"py2app": OPTIONS},
-    setup_requires=["py2app"],
+    setup_requires=["py2app==0.21"],
     version="0.0.1",
     description="Bounding box annotations",
     packages=find_packages(exclude=["tests.*", "tests", "data"]),
