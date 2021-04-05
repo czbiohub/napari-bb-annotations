@@ -24,9 +24,8 @@ conda activate napari-bb-annotations-release
 ${RELEASE_ENV}/bin/python setup.py install
 conda install -y pyqt
 pip install git+https://github.com/napari/napari.git@866848d35d039c098b45e8d6f12eae0924633347 # master - Tested for only until April 4th 
-git clone https://github.com/czbiohub/luminoth-uv-imaging.git
-cd luminoth-uv-imaging
-${RELEASE_ENV}/bin/python setup.py install
+pip install luminoth@git+git://github.com/czbiohub/luminoth-uv-imaging.git@9185796eaf58e57314cbe3bf246677acc0c42bdb
+lumi --help
 
 ${RELEASE_ENV}/bin/python dev/deployment/osx/setup-alias-app.py py2app --alias --dist-dir .
 
