@@ -23,6 +23,9 @@ conda env create -n napari-bb-annotations-release -f environment.yml
 conda activate napari-bb-annotations-release
 ${RELEASE_ENV}/bin/python setup.py install
 conda install -y pyqt
+pip install git+git://github.com/czbiohub/luminoth-uv-imaging.git@6a5115c395c915a4f8390732182e5c32d0c30794 # master - Tested for only until April 4th commit of master
+pip install git+git://github.com/napari/napari.git@866848d35d039c098b45e8d6f12eae0924633347 # master - Tested for only until April 4th commit of master
+lumi predict --help
 
 ${RELEASE_ENV}/bin/python dev/deployment/osx/setup-alias-app.py py2app --alias --dist-dir .  --packages=wx --emulate-shell-environment
 
