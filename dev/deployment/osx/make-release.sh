@@ -24,7 +24,7 @@ conda activate napari-bb-annotations-release
 ${RELEASE_ENV}/bin/python setup.py install
 conda install -y pyqt
 
-${RELEASE_ENV}/bin/python dev/deployment/osx/setup-alias-app.py py2app --alias --dist-dir .
+${RELEASE_ENV}/bin/python dev/deployment/osx/setup-alias-app.py py2app --alias --dist-dir .  --packages=wx --emulate-shell-environment
 
 # proper QT-conf
 cat <<EOF > bb_annotations.app/Contents/Resources/qt.conf
