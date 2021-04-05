@@ -2,9 +2,9 @@ import datetime
 import logging
 import os
 import pickle
-import subprocess
 from typing import List
 
+import luminoth.predict
 import numpy as np
 import pandas as pd
 from magicgui.widgets import ComboBox, Container, Table
@@ -27,22 +27,6 @@ def pickle_load(path):
         return pickle.load(fh)
 
 
-def run_shell_cmd(cmd, fail_ok=False):
-    logger.info('running: {}'.format(cmd))
-    proc = subprocess.Popen(
-        cmd, shell=True, stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE)
-    (out, err) = proc.communicate()
-
-    out = out.decode('utf-8')
-    err = err.decode('utf-8')
-
-    if proc.returncode != 0 and not fail_ok:
-        logger.info('out: {}'.format(out))
-        logger.info('err: {}'.format(err))
-        raise AssertionError("exit code is non zero: %d" % proc.returncode)
-
-    return (proc.returncode, out, err)
 # create the GUI for selecting the values
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -229,7 +213,7 @@ def save_bb_labels(viewer):
     logger.info("Pressed save bounding boxes, labels button")
     with notification_manager:
         # save all of the events that get emitted
-        store: List[Notification] = []
+        store: List[Notification] = []   # noqa
         _append = lambda e: store.append(e)  # lambda needed on py3.7  # noqa
         notification_manager.notification_ready.connect(_append)
         show_info('Pressed save bounding boxes, labels button')
@@ -287,7 +271,7 @@ def save_bb_labels(viewer):
             image_at_index.save(overlaid_save_name)
     with notification_manager:
         # save all of the events that get emitted
-        store: List[Notification] = []
+        store: List[Notification] = []   # noqa
         _append = lambda e: store.append(e)  # lambda needed on py3.7  # noqa
         notification_manager.notification_ready.connect(_append)
         show_info("csv path and overlaid images path is {}".format(csv_path, save_overlay_path))
@@ -299,7 +283,7 @@ def load_bb_labels(viewer):
     logger.info("Pressed load bounding box, labels button")
     with notification_manager:
         # save all of the events that get emitted
-        store: List[Notification] = []
+        store: List[Notification] = []   # noqa
         _append = lambda e: store.append(e)  # lambda needed on py3.7  # noqa
         notification_manager.notification_ready.connect(_append)
 
@@ -339,7 +323,7 @@ def run_inference_on_images(viewer):
     logger.info("Pressed button for running prediction")
     with notification_manager:
         # save all of the events that get emitted
-        store: List[Notification] = []
+        store: List[Notification] = []   # noqa
         _append = lambda e: store.append(e)  # lambda needed on py3.7  # noqa
         notification_manager.notification_ready.connect(_append)
 
@@ -357,7 +341,7 @@ def run_inference_on_images(viewer):
         if set(already_inferenced) == {True}:
             with notification_manager:
                 # save all of the events that get emitted
-                store: List[Notification] = []
+                store: List[Notification] = []  # noqa
                 _append = lambda e: store.append(e)  # lambda needed on py3.7  # noqa
                 notification_manager.notification_ready.connect(_append)
 
@@ -365,11 +349,29 @@ def run_inference_on_images(viewer):
             logger.info("Already ran prediction")
     if set(already_inferenced) == {False}:
         model = image_layer.metadata["model"]
-
         csv_path = os.path.join(dirname, "bb_labels.csv")
-        run_shell_cmd(
-            'lumi predict {} --checkpoint {} -f {}'.format(
-                dirname, model, csv_path))
+        path_or_dir = dirname
+        config_files = None
+        checkpoint = model
+        override_params = None
+        output_path = csv_path
+        save_media_to = None
+        min_prob = 0.5
+        max_prob = 1.5
+        max_detections = 100
+        only_class = None
+        ignore_class = None
+        debug = False
+        xlsx_spacing = 2
+        classes_json = None
+        pixel_distance = 0
+        new_labels = None
+        luminoth.predict.predict_function(
+            path_or_dir, config_files, checkpoint, override_params,
+            output_path, save_media_to, min_prob, max_prob,
+            max_detections, only_class,
+            ignore_class, debug, xlsx_spacing,
+            classes_json, pixel_distance, new_labels)
         inferenced_list = [True] * len(all_files)
         viewer.layers["Image"].metadata["inferenced"] = inferenced_list
         metadata = {"inferenced": inferenced_list}
@@ -411,6 +413,12 @@ def get_properties_table(current_properties):
 
 def edit_bb_labels(viewer):
     logger.info("Pressed edit labels for a bounding box button")
+    with notification_manager:
+        # save all of the events that get emitted
+        store: List[Notification] = []   # noqa
+        _append = lambda e: store.append(e)  # lambda needed on py3.7  # noqa
+        notification_manager.notification_ready.connect(_append)
+        show_info('Pressed edit bounding box label button')
     shapes_layer = viewer.layers["Shapes"]
 
     current_properties = shapes_layer.current_properties['box_label'].tolist()
@@ -484,10 +492,28 @@ def run_inference_on_image(viewer):
             df = pd.DataFrame(columns=LUMI_CSV_COLUMNS)
         csv_path_per_image = os.path.join(
             dirname, "bb_labels_{}.csv".format(os.path.basename(filename)))
-        run_shell_cmd(
-            'lumi predict ' + '"{}"'.format(filename) +
-            ' --checkpoint ' + model +
-            ' -f ' + '"{}"'.format(csv_path_per_image))
+        path_or_dir = filename
+        config_files = None
+        checkpoint = model
+        override_params = None
+        output_path = csv_path_per_image
+        save_media_to = None
+        min_prob = 0.5
+        max_prob = 1.5
+        max_detections = 100
+        only_class = None
+        ignore_class = None
+        debug = False
+        xlsx_spacing = 2
+        classes_json = None
+        pixel_distance = 0
+        new_labels = None
+        luminoth.predict.predict_function(
+            path_or_dir, config_files, checkpoint, override_params,
+            output_path, save_media_to, min_prob, max_prob,
+            max_detections, only_class,
+            ignore_class, debug, xlsx_spacing,
+            classes_json, pixel_distance, new_labels)
         if os.path.exists(csv_path_per_image):
             frames = [df, pd.read_csv(csv_path_per_image, index_col=False)]
             os.remove(csv_path_per_image)
