@@ -1,1 +1,1 @@
-from .bb_annotations import main
+from .bb_annotations import launch_viewer
