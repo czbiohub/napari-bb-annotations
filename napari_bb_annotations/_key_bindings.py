@@ -10,6 +10,8 @@ import pandas as pd
 from magicgui.widgets import ComboBox, Container, Table
 from PIL import Image, ImageDraw
 from .constants_lumi import BOX_ANNOTATIONS, LUMI_CSV_COLUMNS
+from napari_bb_annotations.run_inference import (
+    detect_images, DEFAULT_CONFIDENCE, DEFAULT_INFERENCE_COUNT)
 from napari.utils.notifications import (
     Notification,
     notification_manager,
@@ -328,55 +330,23 @@ def run_inference_on_images(viewer):
         notification_manager.notification_ready.connect(_append)
 
         show_info('Pressed button for running prediction, takes up to 1s per bounding box')
-    image_layer = viewer.layers["Image"]
-    all_files = image_layer.metadata["all_files"]
+    all_files = viewer.layers["image"].metadata["all_files"]
     filename = all_files[0]
     dirname = os.path.dirname(filename)
-    inference_metadata_path = os.path.join(
-        dirname, "inference_metadata.pickle")
-    already_inferenced = [False] * len(all_files)
-    if os.path.exists(inference_metadata_path):
-        inference_metadata = pickle_load(inference_metadata_path)
-        already_inferenced = inference_metadata["inferenced"]
-        if set(already_inferenced) == {True}:
-            with notification_manager:
-                # save all of the events that get emitted
-                store: List[Notification] = []  # noqa
-                _append = lambda e: store.append(e)  # lambda needed on py3.7  # noqa
-                notification_manager.notification_ready.connect(_append)
 
-                show_info('Already ran prediction, click load')
-            logger.info("Already ran prediction")
-    if set(already_inferenced) == {False}:
-        model = image_layer.metadata["model"]
-        csv_path = os.path.join(dirname, "bb_labels.csv")
-        path_or_dir = dirname
-        config_files = None
-        checkpoint = model
-        override_params = None
-        output_path = csv_path
-        save_media_to = None
-        min_prob = 0.5
-        max_prob = 1.5
-        max_detections = 100
-        only_class = None
-        ignore_class = None
-        debug = False
-        xlsx_spacing = 2
-        classes_json = None
-        pixel_distance = 0
-        new_labels = None
-        luminoth.predict.predict_function(
-            path_or_dir, config_files, checkpoint, override_params,
-            output_path, save_media_to, min_prob, max_prob,
-            max_detections, only_class,
-            ignore_class, debug, xlsx_spacing,
-            classes_json, pixel_distance, new_labels)
-        inferenced_list = [True] * len(all_files)
-        viewer.layers["Image"].metadata["inferenced"] = inferenced_list
-        metadata = {"inferenced": inferenced_list}
-        pickle_save(inference_metadata_path, metadata)
-        logger.info("subprocess call completed ")
+    box_annotations = viewer.layers["image"].metadata["box_annotations"]
+    model = viewer.layers["image"].metadata["model"]
+    use_tpu = viewer.layers["image"].metadata["edgetpu"]
+
+    labels_txt = os.path.join(dirname, "labels.txt")
+    with open(labels_txt, 'w') as f:
+        for index, label in enumerate(box_annotations):
+            f.write("{} {}\n".format(index, label))
+
+    format_of_files = os.path.splitext(filename)[1]
+    detect_images(
+        model, use_tpu, dirname, format_of_files,
+        labels_txt, DEFAULT_CONFIDENCE, dirname, DEFAULT_INFERENCE_COUNT, False)
 
 
 def update_layers(viewer):
