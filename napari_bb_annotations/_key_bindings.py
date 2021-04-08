@@ -390,6 +390,7 @@ def edit_bb_labels(viewer):
         notification_manager.notification_ready.connect(_append)
         show_info('Pressed edit bounding box label button')
     shapes_layer = viewer.layers["Shapes"]
+    shapes_layer.mode = 'select'
 
     current_properties = shapes_layer.current_properties['box_label'].tolist()
     table_widget = get_properties_table(current_properties)
@@ -404,6 +405,8 @@ def edit_bb_labels(viewer):
         current_properties['box_label'] = np.asarray([new_label])
         shapes_layer.current_properties = current_properties
         table_widget.clear()
+        # set the shapes layer mode back to pan/zoom
+        shapes_layer.mode = 'add_rectangle'
 
     table_widget.native.itemChanged.connect(on_item_changed)
 
@@ -439,63 +442,3 @@ def load_bb_labels_for_image(viewer):
     shapes_layer.data = bboxes
     shapes_layer.properties["box_label"] = np.array(labels)
     shapes_layer.text.refresh_text(shapes_layer.properties)
-
-
-def run_inference_on_image(viewer):
-    logger.info("Pressed button to run inference/prediction")
-    image_layer = viewer.layers["Image"]
-    metadata = image_layer.metadata
-    all_files = metadata["all_files"]
-    index_of_image = viewer.dims.current_step[0]
-    filename = all_files[index_of_image]
-    dirname = os.path.dirname(filename)
-    model = image_layer.metadata["model"]
-
-    csv_path = os.path.join(dirname, "bb_labels.csv")
-
-    if not viewer.layers["Image"].metadata["inferenced"][index_of_image]:
-        # To not overwrite the existing csv, and lose the predictions per image
-        # from last image
-        if os.path.exists(csv_path):
-            df = pd.read_csv(csv_path, index_col=False)
-        else:
-            df = pd.DataFrame(columns=LUMI_CSV_COLUMNS)
-        csv_path_per_image = os.path.join(
-            dirname, "bb_labels_{}.csv".format(os.path.basename(filename)))
-        path_or_dir = filename
-        config_files = None
-        checkpoint = model
-        override_params = None
-        output_path = csv_path_per_image
-        save_media_to = None
-        min_prob = 0.5
-        max_prob = 1.5
-        max_detections = 100
-        only_class = None
-        ignore_class = None
-        debug = False
-        xlsx_spacing = 2
-        classes_json = None
-        pixel_distance = 0
-        new_labels = None
-        luminoth.predict.predict_function(
-            path_or_dir, config_files, checkpoint, override_params,
-            output_path, save_media_to, min_prob, max_prob,
-            max_detections, only_class,
-            ignore_class, debug, xlsx_spacing,
-            classes_json, pixel_distance, new_labels)
-        if os.path.exists(csv_path_per_image):
-            frames = [df, pd.read_csv(csv_path_per_image, index_col=False)]
-            os.remove(csv_path_per_image)
-            result_df = pd.concat(frames, ignore_index=True)
-            result_df.to_csv(csv_path, index=False)
-            logger.info("lumi prediction per image subprocess call completed ")
-            viewer.layers["Image"].metadata["inferenced"][index_of_image] = True
-            load_bb_labels_for_image(viewer)
-        else:
-            logger.error("Prediction unsuccesful")
-            e.args += ('Prediction unsuccesful')
-            notif = ErrorNotification(AssertionError)
-            dialog = NapariQtNotification.from_notification(notif)
-    else:
-        load_bb_labels_for_image(viewer)

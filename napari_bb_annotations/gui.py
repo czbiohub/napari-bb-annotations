@@ -1,4 +1,4 @@
-from qtpy.QtWidgets import QPushButton, QLabel
+from qtpy.QtWidgets import QPushButton
 from ._key_bindings import (
     save_bb_labels,
     load_bb_labels,
@@ -21,10 +21,6 @@ def connect_to_viewer(viewer):
     run_inference_btn.clicked.connect(lambda: run_inference_on_images(viewer))
     run_inference_btn.setToolTip("Prediction per 100 images with 20 bbs takes upto 30 minutes depending on CPU/GPU")
 
-    run_inference_single_image_btn = QPushButton("Tensorflow Predict ONLY CURRENT image")
-    run_inference_single_image_btn.clicked.connect(lambda: run_inference_on_images(viewer))
-    run_inference_single_image_btn.setToolTip("Prediction per image with 20 bbs takes upto 20 seconds depending on CPU/GPU")
-
     load_gui_btn = QPushButton("Load annotations")
     load_gui_btn.clicked.connect(lambda: load_bb_labels(viewer))
     load_gui_btn.setToolTip("Loads annotations from an existing file named bb_labels.csv created last time prediction was ran")
@@ -39,9 +35,9 @@ def connect_to_viewer(viewer):
 
     viewer.window.add_dock_widget(
         [run_inference_btn,
-         run_inference_single_image_btn,
          load_gui_btn,
-         save_gui_btn, edit_bb_label_btn],
+         save_gui_btn,
+         edit_bb_label_btn],
         area="right",
         allowed_areas=["right", "left"],
     )
