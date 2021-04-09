@@ -341,21 +341,51 @@ def run_inference_on_images(viewer):
     all_files = viewer.layers["image"].metadata["all_files"]
     filename = all_files[0]
     dirname = os.path.dirname(filename)
+    inference_metadata_path = os.path.join(
+        dirname, "inference_metadata.pickle")
+    already_inferenced = [False] * len(all_files)
+    if os.path.exists(inference_metadata_path):
+        inference_metadata = pickle_load(inference_metadata_path)
+        already_inferenced = inference_metadata["tflite_inferenced"]
+        if set(already_inferenced) == {True}:
+            with notification_manager:
+                # save all of the events that get emitted
+                store: List[Notification] = []  # noqa
+                _append = lambda e: store.append(e)  # lambda needed on py3.7  # noqa
+                notification_manager.notification_ready.connect(_append)
 
-    box_annotations = viewer.layers["image"].metadata["box_annotations"]
-    model = viewer.layers["image"].metadata["model"]
-    use_tpu = viewer.layers["image"].metadata["edgetpu"]
+                show_info('Already ran tflite prediction, click load')
+            logger.info("Already ran tflite prediction")
+    if set(already_inferenced) == {False}:
+        box_annotations = viewer.layers["image"].metadata["box_annotations"]
+        model = viewer.layers["image"].metadata["model"]
+        use_tpu = viewer.layers["image"].metadata["edgetpu"]
 
-    labels_txt = os.path.join(dirname, "labels.txt")
-    with open(labels_txt, 'w') as f:
-        for index, label in enumerate(box_annotations):
-            f.write("{} {}\n".format(index, label))
+        labels_txt = os.path.join(dirname, "labels.txt")
+        with open(labels_txt, 'w') as f:
+            for index, label in enumerate(box_annotations):
+                f.write("{} {}\n".format(index, label))
 
-    format_of_files = os.path.splitext(filename)[1]
-    detect_images(
-        model, use_tpu, dirname, format_of_files,
-        labels_txt, DEFAULT_CONFIDENCE, dirname,
-        DEFAULT_INFERENCE_COUNT, False)
+        format_of_files = os.path.splitext(filename)[1]
+        inferenced_list = [True] * len(all_files)
+        viewer.layers["Image"].metadata["tflite_inferenced"] = inferenced_list
+        metadata = {"tflite_inferenced": inferenced_list}
+        pickle_save(inference_metadata_path, metadata)
+        detect_images(
+            model, use_tpu, dirname, format_of_files,
+            labels_txt, DEFAULT_CONFIDENCE, dirname,
+            DEFAULT_INFERENCE_COUNT, False)
+        df = pd.DataFrame(columns=LUMI_CSV_COLUMNS)
+        for index, row in df.iterrows():
+            df = df.append(
+                {'image_id': row.image_id,
+                 'xmin': row.xmin,
+                 'ymin': row.ymin,
+                 'xmax': row.xmax,
+                 'ymax': row.ymax,
+                 'label': "healthy",
+                 }, ignore_index=True)
+        df.to_csv(os.path.join(dirname, "bb_labels.csv"), index=False)
 
 
 def run_segmentation_on_images(viewer):
@@ -369,33 +399,52 @@ def run_segmentation_on_images(viewer):
         show_info('Pressed button for running segmentation')
     # label image regions
     all_files = viewer.layers["image"].metadata["all_files"]
-    for path in all_files:
-        numpy_image = imread(path)[:, :, 0]
-        thresholded_image = np.zeros(
-            (numpy_image.shape[0], numpy_image.shape[1]), dtype=np.uint8)
-        thresh_value = threshold_otsu(numpy_image)
-        thresholded_image[numpy_image < thresh_value] = 255
-        label_image = label(thresholded_image)
-        df = pd.DataFrame(columns=LUMI_CSV_COLUMNS)
-        height, width = numpy_image.shape[:2]
+    dirname = os.path.dirname(filename)
+    inference_metadata_path = os.path.join(
+        dirname, "inference_metadata.pickle")
+    already_inferenced = [False] * len(all_files)
+    if os.path.exists(inference_metadata_path):
+        inference_metadata = pickle_load(inference_metadata_path)
+        already_inferenced = inference_metadata["threshold_inferenced"]
+        if set(already_inferenced) == {True}:
+            with notification_manager:
+                # save all of the events that get emitted
+                store: List[Notification] = []  # noqa
+                _append = lambda e: store.append(e)  # lambda needed on py3.7  # noqa
+                notification_manager.notification_ready.connect(_append)
 
-        for region in regionprops(label_image):
-            # take regions with large enough areas
-            if region.area >= 500:
-                # draw rectangle around segmented coins
-                xmin, ymin, xmax, ymax = region.bbox
-                bbox = check_bbox(xmin, ymin, xmax, ymax, width, height)
-                label = labels[index]
-                df = df.append(
-                    {'image_id': file_path,
-                     'xmin': int(bbox[0]),
-                     'ymin': int(bbox[1]),
-                     'xmax': int(bbox[2]),
-                     'ymax': int(bbox[3]),
-                     'label': "healthy",
-                     }, ignore_index=True)
-                labels_for_image.append(label)
-                bboxes_converted.append(bbox)
+                show_info('Already ran threshold prediction, click load')
+            logger.info("Already ran threshold prediction")
+    if set(already_inferenced) == {False}:
+        for path in all_files:
+            numpy_image = imread(path)[:, :, 0]
+            thresholded_image = np.zeros(
+                (numpy_image.shape[0], numpy_image.shape[1]), dtype=np.uint8)
+            thresh_value = threshold_otsu(numpy_image)
+            thresholded_image[numpy_image < thresh_value] = 255
+            label_image = label(thresholded_image)
+            df = pd.DataFrame(columns=LUMI_CSV_COLUMNS)
+            height, width = numpy_image.shape[:2]
+
+            for region in regionprops(label_image):
+                # take regions with large enough areas
+                if region.area >= 500:
+                    # draw rectangle around segmented coins
+                    xmin, ymin, xmax, ymax = region.bbox
+                    bbox = check_bbox(xmin, ymin, xmax, ymax, width, height)
+                    label = labels[index]
+                    df = df.append(
+                        {'image_id': file_path,
+                         'xmin': int(bbox[0]),
+                         'ymin': int(bbox[1]),
+                         'xmax': int(bbox[2]),
+                         'ymax': int(bbox[3]),
+                         'label': "healthy",
+                         }, ignore_index=True)
+        inferenced_list = [True] * len(all_files)
+        viewer.layers["Image"].metadata["threshold_inferenced"] = inferenced_list
+        metadata = {"threshold_inferenced": inferenced_list}
+        df.to_csv(os.path.join(dirname, "bb_labels.csv"), index=False)
 
 
 def run_tracking_on_images(viewer):
@@ -507,3 +556,63 @@ def load_bb_labels_for_image(viewer):
     shapes_layer.data = bboxes
     shapes_layer.properties["box_label"] = np.array(labels)
     shapes_layer.text.refresh_text(shapes_layer.properties)
+
+
+def run_inference_on_image(viewer):
+    logger.info("Pressed button to run inference/prediction")
+    image_layer = viewer.layers["Image"]
+    metadata = image_layer.metadata
+    all_files = metadata["all_files"]
+    index_of_image = viewer.dims.current_step[0]
+    filename = all_files[index_of_image]
+    dirname = os.path.dirname(filename)
+    model = image_layer.metadata["model"]
+
+    csv_path = os.path.join(dirname, "bb_labels.csv")
+
+    if not viewer.layers["Image"].metadata["lumi_inferenced"][index_of_image]:
+        # To not overwrite the existing csv, and lose the predictions per image
+        # from last image
+        if os.path.exists(csv_path):
+            df = pd.read_csv(csv_path, index_col=False)
+        else:
+            df = pd.DataFrame(columns=LUMI_CSV_COLUMNS)
+        csv_path_per_image = os.path.join(
+            dirname, "bb_labels_{}.csv".format(os.path.basename(filename)))
+        path_or_dir = filename
+        config_files = None
+        checkpoint = model
+        override_params = None
+        output_path = csv_path_per_image
+        save_media_to = None
+        min_prob = 0.5
+        max_prob = 1.5
+        max_detections = 100
+        only_class = None
+        ignore_class = None
+        debug = False
+        xlsx_spacing = 2
+        classes_json = None
+        pixel_distance = 0
+        new_labels = None
+        luminoth.predict.predict_function(
+            path_or_dir, config_files, checkpoint, override_params,
+            output_path, save_media_to, min_prob, max_prob,
+            max_detections, only_class,
+            ignore_class, debug, xlsx_spacing,
+            classes_json, pixel_distance, new_labels)
+        if os.path.exists(csv_path_per_image):
+            frames = [df, pd.read_csv(csv_path_per_image, index_col=False)]
+            os.remove(csv_path_per_image)
+            result_df = pd.concat(frames, ignore_index=True)
+            result_df.to_csv(csv_path, index=False)
+            logger.info("lumi prediction per image subprocess call completed ")
+            viewer.layers["Image"].metadata["lumi_inferenced"][index_of_image] = True
+            load_bb_labels_for_image(viewer)
+        else:
+            logger.error("Prediction unsuccesful")
+            e.args += ('Prediction unsuccesful')
+            notif = ErrorNotification(AssertionError)
+            dialog = NapariQtNotification.from_notification(notif)
+    else:
+        load_bb_labels_for_image(viewer)
