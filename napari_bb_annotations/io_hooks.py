@@ -11,6 +11,7 @@ https://napari.org/docs/plugins/for_plugin_developers.html
 """
 import glob
 import os
+import subprocess
 
 from natsort import natsorted
 import numpy as np
@@ -19,6 +20,9 @@ from skimage.io import imread
 from napari_plugin_engine import napari_hook_implementation
 from napari_bb_annotations.constants_lumi import (
     BOX_ANNOTATIONS, MODEL, EDGETPU, IMAGE_FORMATS)
+
+
+VIDEO_EXTS = [".avi", ".m4v", ".mkv", ".mp4"]
 
 
 def create_dir_if_not_exists(path):
@@ -46,8 +50,25 @@ def napari_get_reader(path):
         # if it is a list, it is assumed to be an image stack...
         # so we are only going to look at the first file.
         path = path[0]
+
+    # if we know we cannot read the file, we immediately return None.
+    if not os.path.splitext(path)[1].lower() in VIDEO_EXTS:
+        return None
+
     assert os.path.exists(path)
     return reader_function
+
+
+def convert_video(path):
+    location = os.path.dirname(path)
+    filename_wo_format = os.path.basename(path).split(".")[0]
+    output_frames_path = os.path.join(
+        location, "frames_{}".format(filename_wo_format))
+    create_dir_if_not_exists(output_frames_path)
+    subprocess.check_call(
+        'ffmpeg -i "{}" -f image2 "{}/video-frame%05d.jpg"'.format(
+            path, output_frames_path), shell=True)
+    return output_frames_path
 
 
 def reader_function(path):
@@ -70,6 +91,12 @@ def reader_function(path):
         Both "meta", and "layer_type" are optional. napari will default to
         layer_type=="image" if not provided
     """
+    video_file = False
+    for format_of_files in VIDEO_EXTS:
+        if path.endswith(format_of_files):
+            video_file = True
+    if video_file:
+        path = convert_video(path)
     path = path + os.sep if not path.endswith(os.sep) else path
     dirname = os.path.dirname(path)
     save_overlay_path = os.path.abspath(
@@ -101,7 +128,9 @@ def reader_function(path):
         "new_labels": [],
         "loaded": False,
         "updated": False,
-        "inferenced": [False] * num_files,
+        "tflite_inferenced": [False] * num_files,
+        "threshold_inferenced": [False] * num_files,
+        "lumi_inferenced": [False] * num_files,
         "model": MODEL,
         "edgetpu": EDGETPU},
         "name": "Image"}

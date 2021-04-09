@@ -17,6 +17,13 @@ from napari.utils.notifications import (
     notification_manager,
     show_info,
 )
+from skimage.io import imread
+from skimage.filters import threshold_otsu
+from skimage.measure import label, regionprops
+
+import centroid_tracker
+
+MAX_DISAPPEARED_FRAMES = 35
 
 
 def pickle_save(path, metadata_dct):
@@ -63,7 +70,7 @@ def check_bbox(bbox, width, height):
     return np.array([xmin, ymin, xmax, ymax])
 
 
-def draw_objects(draw, bboxes, labels):
+def draw_objects(draw, bboxes, labels, cell_ids):
     """Draws the bounding box and label for each object."""
     for index, bbox in enumerate(bboxes):
         draw.rectangle([(bbox[0], bbox[1]), (bbox[2], bbox[3])],
@@ -71,12 +78,12 @@ def draw_objects(draw, bboxes, labels):
         label = labels[index]
         if " " not in label:
             draw.text((bbox[0] + 10, bbox[1] + 10),
-                      '%s' % (labels[index]),
+                      '{}-cell{}'.format(labels[index], cell_ids[index]),
                       fill='red')
         else:
             split1, split2 = label.split(" ")
             draw.text((bbox[0] + 10, bbox[1] + 10),
-                      '%s/n%s' % (split1, split2),
+                      '{}/n{}-cell{}'.format(split1, split2, cell_ids[index]),
                       fill='red')
 
 
@@ -213,6 +220,7 @@ def update_summary_table(shapes_layer, image_layer):
 
 def save_bb_labels(viewer):
     logger.info("Pressed save bounding boxes, labels button")
+    # TODO add unique_cell_id column while saving maybe?
     with notification_manager:
         # save all of the events that get emitted
         store: List[Notification] = []   # noqa
@@ -329,7 +337,7 @@ def run_inference_on_images(viewer):
         _append = lambda e: store.append(e)  # lambda needed on py3.7  # noqa
         notification_manager.notification_ready.connect(_append)
 
-        show_info('Pressed button for running prediction, takes up to 1s per bounding box')
+        show_info('Pressed button for running prediction, takes up to 1s per image')
     all_files = viewer.layers["image"].metadata["all_files"]
     filename = all_files[0]
     dirname = os.path.dirname(filename)
@@ -346,7 +354,64 @@ def run_inference_on_images(viewer):
     format_of_files = os.path.splitext(filename)[1]
     detect_images(
         model, use_tpu, dirname, format_of_files,
-        labels_txt, DEFAULT_CONFIDENCE, dirname, DEFAULT_INFERENCE_COUNT, False)
+        labels_txt, DEFAULT_CONFIDENCE, dirname,
+        DEFAULT_INFERENCE_COUNT, False)
+
+
+def run_segmentation_on_images(viewer):
+    logger.info("Pressed button for running segmentation")
+    with notification_manager:
+        # save all of the events that get emitted
+        store: List[Notification] = []   # noqa
+        _append = lambda e: store.append(e)  # lambda needed on py3.7  # noqa
+        notification_manager.notification_ready.connect(_append)
+
+        show_info('Pressed button for running segmentation')
+    # label image regions
+    all_files = viewer.layers["image"].metadata["all_files"]
+    for path in all_files:
+        numpy_image = imread(path)[:, :, 0]
+        thresholded_image = np.zeros(
+            (numpy_image.shape[0], numpy_image.shape[1]), dtype=np.uint8)
+        thresh_value = threshold_otsu(numpy_image)
+        thresholded_image[numpy_image < thresh_value] = 255
+        label_image = label(thresholded_image)
+        df = pd.DataFrame(columns=LUMI_CSV_COLUMNS)
+        height, width = numpy_image.shape[:2]
+
+        for region in regionprops(label_image):
+            # take regions with large enough areas
+            if region.area >= 500:
+                # draw rectangle around segmented coins
+                xmin, ymin, xmax, ymax = region.bbox
+                bbox = check_bbox(xmin, ymin, xmax, ymax, width, height)
+                label = labels[index]
+                df = df.append(
+                    {'image_id': file_path,
+                     'xmin': int(bbox[0]),
+                     'ymin': int(bbox[1]),
+                     'xmax': int(bbox[2]),
+                     'ymax': int(bbox[3]),
+                     'label': "healthy",
+                     }, ignore_index=True)
+                labels_for_image.append(label)
+                bboxes_converted.append(bbox)
+
+
+def run_tracking_on_images(viewer):
+    logger.info("Pressed button for running tracking")
+    # TODO Update summary table based on tracking
+    with notification_manager:
+        # save all of the events that get emitted
+        store: List[Notification] = []   # noqa
+        _append = lambda e: store.append(e)  # lambda needed on py3.7  # noqa
+        notification_manager.notification_ready.connect(_append)
+
+        show_info('Pressed button for running tracking')
+    all_files = viewer.layers["image"].metadata["all_files"]
+
+    df = centroid_tracker.df_centroid_tracking_rectangles(
+        df, MAX_DISAPPEARED_FRAMES, all_files)
 
 
 def update_layers(viewer):
