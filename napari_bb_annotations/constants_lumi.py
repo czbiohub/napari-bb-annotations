@@ -5,7 +5,9 @@ BOX_ANNOTATIONS = [
     "schizont",
     "troph"
 ]
-MODEL = ""
+MODEL = "1a0f3002f674"
 IMAGE_FORMATS = [".png", ".tiff", ".tif", ".jpg", ".jpeg"]
 LUMI_CSV_COLUMNS = [
-    'image_id', 'xmin', 'xmax', 'ymin', 'ymax', 'label', 'prob', "unique_cell_id"]
+    'image_id', 'xmin', 'xmax', 'ymin', 'ymax',
+    'label', 'prob', "unique_cell_id"]
+EDGE_COLOR_CYCLE = ['GREEN', 'CYAN', 'BLUE', 'RED']

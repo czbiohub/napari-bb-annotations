@@ -19,7 +19,7 @@ from skimage.io import imread
 
 from napari_plugin_engine import napari_hook_implementation
 from napari_bb_annotations.constants_lumi import (
-    BOX_ANNOTATIONS, MODEL, EDGETPU, IMAGE_FORMATS)
+    BOX_ANNOTATIONS, MODEL, EDGETPU, IMAGE_FORMATS, EDGE_COLOR_CYCLE)
 
 
 VIDEO_EXTS = [".avi", ".m4v", ".mkv", ".mp4"]
@@ -136,13 +136,16 @@ def reader_function(path):
         "name": "Image"}
 
     text_kwargs = {
-        'text': 'box_label',
+        'text': '{box_label}: {unique_cell_id}%',
         'size': 8,
         'color': 'green'
     }
     add_kwargs = dict(
-        face_color="black", properties={"box_label": BOX_ANNOTATIONS}, ndim=3,
-        text=text_kwargs, name="Shapes", edge_color="black", opacity=0.5)
+        face_color="black", edge_color='box_label',
+        edge_color_cycle=EDGE_COLOR_CYCLE,
+        properties={"box_label": BOX_ANNOTATIONS, "unique_cell_id": [0]},
+        ndim=3,
+        text=text_kwargs, name="Shapes", opacity=0.5)
     layer_list = [
         (stack, metadata, layer_type),
         (None, add_kwargs, "shapes")]

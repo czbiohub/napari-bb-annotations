@@ -144,7 +144,7 @@ class CentroidTracker():
             # register each new input centroid as a trackable object
             for col in unused_cols:
                 self.register(input_centroids[col])
-
+        self.object_ids = object_id
         # return the set of trackable objects
         return self.objects
 
@@ -220,26 +220,29 @@ def df_centroid_tracking_rectangles(df, max_disappeared, all_files):
 
     # initialize trajectory path graph
     trajectory_path_graph = {}
-
+    unique_cell_ids = [0] * len(df)
     # loop over the images in the binary annotations folder
     for frame_count, image_path in enumerate(all_files):
-        tmp_df = df[df.image_id == image_path]
         centroids = []
-        for index, row in tmp_df.iterrows():
-            centroid = tuple(
-                (row.xmin + row.xmax) // 2, (row.ymin + row.ymax) // 2)
-            centroids.append(centroid)
+        cell_indices = []
+        for index, row in df.iterrows():
+            if df.image_id == image_path:
+                centroid = tuple(
+                    (row.xmin + row.xmax) // 2, (row.ymin + row.ymax) // 2)
+                centroids.append(centroid)
+                cell_indices.append(index)
         # update our centroid tracker using the computed set of centroids
         current_cell_ids = centroid_tracker.update(centroids)
+        for cell_idx in cell_indices:
+            unique_cell_ids[cell_idx] + centroid_tracker.object_ids
         trajectory_path_graph = update_trajectory_path_graph(
             current_cell_ids,
             trajectory_path_graph,
             frame_count)
-    # TODO update unique cell ids column in dataframe
-    # "unique_cell_id"
-
+    # update unique cell ids column in dataframe "unique_cell_id"
+    df['unique_cell_id'] = unique_cell_ids
     # Save the tracking path dataframe
-    trajectory_df = pd.DataFrame(trajectory_path_graph)
+    trajectory_df = pd.DataFrame(pd.DataFrame(trajectory_path_graph))
     trajectory_df.to_csv(
         os.path.join(
             os.path.dirname(all_files[0]) + "trajectory_path_graph.csv"))

@@ -23,15 +23,23 @@ import numpy as np
 import pandas as pd
 from PIL import Image
 from PIL import ImageDraw
-import detect
-import utils
+import napari_bb_annotations.detect as detect
+import napari_bb_annotations.utils as utils
+
+LUMI_CSV_COLUMNS = [
+    'image_id', 'xmin', 'xmax', 'ymin',
+    'ymax', 'label', 'prob', 'unique_cell_id']
+DEFAULT_CONFIDENCE = 0.4
+DEFAULT_FILTER_AREA = 22680
+DEFAULT_INFERENCE_COUNT = 1
+DEFAULT_IMAGE_FORMAT = ".jpg"
 
 
 def detect_images(
         model, use_tpu, input_path, format_of_files,
         labels, threshold, output, count, overlaid,
         area_filter, filter_background_bboxes):
-    df = pd.DataFrame(columns=utils.LUMI_CSV_COLUMNS)
+    df = pd.DataFrame(columns=LUMI_CSV_COLUMNS)
     output = os.path.abspath(output)
     utils.create_dir_if_not_exists(output)
     labels = utils.load_labels(labels) if labels else {}
@@ -120,6 +128,7 @@ def detect_images(
                 os.path.join(
                     output,
                     os.path.basename(input_image)))
+    df['unique_cell_id'].values[:] = 0
     df.to_csv(os.path.join(output, "bb_labels.csv"))
 
 
@@ -136,17 +145,17 @@ def main():
         '-l', '--labels',
         help='File path of labels file.')
     parser.add_argument(
-        '-t', '--threshold', type=float, default=utils.DEFAULT_CONFIDENCE,
+        '-t', '--threshold', type=float, default=DEFAULT_CONFIDENCE,
         help='Score threshold for detected objects.')
     parser.add_argument(
         '-o', '--output',
         help='File path for the result image with annotations ' +
         'and csv file containing bboxes, annotations')
     parser.add_argument(
-        '-c', '--count', type=int, default=utils.DEFAULT_INFERENCE_COUNT,
+        '-c', '--count', type=int, default=DEFAULT_INFERENCE_COUNT,
         help='Number of times to run inference')
     parser.add_argument(
-        '-f', '--format', type=str, default=utils.DEFAULT_IMAGE_FORMAT,
+        '-f', '--format', type=str, default=DEFAULT_IMAGE_FORMAT,
         help='Format of image')
     parser.add_argument(
         '--edgetpu',
@@ -159,7 +168,7 @@ def main():
     parser.add_argument(
         '--area_filter',
         help='Enable filtering bounding boxes of area', type=int,
-        default=utils.DEFAULT_FILTER_AREA)
+        default=DEFAULT_FILTER_AREA)
     parser.add_argument(
         '--filter_background_bboxes',
         help='Enable filtering bounding boxes that are in the background',

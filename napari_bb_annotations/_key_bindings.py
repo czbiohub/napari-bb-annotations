@@ -9,9 +9,10 @@ import numpy as np
 import pandas as pd
 from magicgui.widgets import ComboBox, Container, Table
 from PIL import Image, ImageDraw
-from .constants_lumi import BOX_ANNOTATIONS, LUMI_CSV_COLUMNS
+from napari_bb_annotations.constants_lumi import (
+    BOX_ANNOTATIONS, LUMI_CSV_COLUMNS)
 from napari_bb_annotations.run_inference import (
-    detect_images, DEFAULT_CONFIDENCE, DEFAULT_INFERENCE_COUNT)
+    detect_images)
 from napari.utils.notifications import (
     Notification,
     notification_manager,
@@ -21,7 +22,7 @@ from skimage.io import imread
 from skimage.filters import threshold_otsu
 from skimage.measure import label, regionprops
 
-import centroid_tracker
+import napari_bb_annotations.centroid_tracker as centroid_tracker
 
 MAX_DISAPPEARED_FRAMES = 35
 
@@ -55,16 +56,12 @@ def check_bbox(bbox, width, height):
         xmin = width
     if xmin < 0:
         xmin = 0
-
     if xmax > width:
         xmax = width
-
     if ymin > height:
         ymin = height
-
     if ymin < 0:
         ymin = 0
-
     if ymax > height:
         ymax = height
     return np.array([xmin, ymin, xmax, ymax])
@@ -220,7 +217,6 @@ def update_summary_table(shapes_layer, image_layer):
 
 def save_bb_labels(viewer):
     logger.info("Pressed save bounding boxes, labels button")
-    # TODO add unique_cell_id column while saving maybe?
     with notification_manager:
         # save all of the events that get emitted
         store: List[Notification] = []   # noqa
@@ -233,6 +229,7 @@ def save_bb_labels(viewer):
     stack = image.data
     bboxes = shape.data
     labels = shape.properties["box_label"].tolist()
+    unique_cell_ids = shape.properties["unique_cell_ids"].tolist()
     save_overlay_path = metadata["save_overlay_path"]
     csv_path = os.path.join(
         os.path.dirname(save_overlay_path), "bb_labels.csv")
@@ -252,12 +249,14 @@ def save_bb_labels(viewer):
         image_at_index = image_at_index.convert('RGB')
         bboxes_converted = []
         labels_for_image = []
+        unique_cell_ids_for_image = []
         for index, bbox in enumerate(bboxes):
             z_index = np.unique((bbox[:, 0])).tolist()
             assert len(z_index) == 1
             if z_index[0] == stack_index:
                 bbox = check_bbox(get_bbox_obj_detection(bbox), width, height)
                 label = labels[index]
+                cell_id = unique_cell_ids[index]
                 df = df.append(
                     {'image_id': file_path,
                      'xmin': int(bbox[0]),
@@ -265,13 +264,17 @@ def save_bb_labels(viewer):
                      'xmax': int(bbox[2]),
                      'ymax': int(bbox[3]),
                      'label': label,
+                     "unique_cell_id": cell_id
                      }, ignore_index=True)
                 labels_for_image.append(label)
+                unique_cell_ids_for_image.append(cell_id)
                 bboxes_converted.append(bbox)
         if len(bboxes_converted) != 0:
             draw_objects(
                 ImageDraw.Draw(image_at_index),
-                bboxes_converted, labels_for_image)
+                bboxes_converted,
+                labels_for_image,
+                unique_cell_ids_for_image)
             # save images
             basename = os.path.basename(file_path)
             overlaid_save_name = os.path.join(
@@ -428,17 +431,16 @@ def run_segmentation_on_images(viewer):
 
             for region in regionprops(label_image):
                 # take regions with large enough areas
-                if region.area >= 500:
+                if region.area >= 1000 and region.area <= 3500:
                     # draw rectangle around segmented coins
                     xmin, ymin, xmax, ymax = region.bbox
-                    bbox = check_bbox(xmin, ymin, xmax, ymax, width, height)
                     label = labels[index]
                     df = df.append(
                         {'image_id': file_path,
-                         'xmin': int(bbox[0]),
-                         'ymin': int(bbox[1]),
-                         'xmax': int(bbox[2]),
-                         'ymax': int(bbox[3]),
+                         'xmin': int(xmin),
+                         'ymin': int(ymin),
+                         'xmax': int(xmax),
+                         'ymax': int(ymax),
                          'label': "healthy",
                          }, ignore_index=True)
         inferenced_list = [True] * len(all_files)
@@ -461,6 +463,7 @@ def run_tracking_on_images(viewer):
 
     df = centroid_tracker.df_centroid_tracking_rectangles(
         df, MAX_DISAPPEARED_FRAMES, all_files)
+    viewer.layers['Shapes'].properties["unique_cell_id"] = df["unique_cell_id"].tolist()
 
 
 def update_layers(viewer):

@@ -7,7 +7,6 @@ import numpy as np
 import pandas as pd
 from PIL import Image
 from PIL import ImageDraw
-import detect
 from skimage.draw import rectangle
 from skimage.filters import threshold_otsu
 import tflite_runtime.interpreter as tflite
@@ -19,12 +18,6 @@ EDGETPU_SHARED_LIB = {
     'Darwin': 'libedgetpu.1.dylib',
     'Windows': 'edgetpu.dll'
 }[platform.system()]
-LUMI_CSV_COLUMNS = [
-    'image_id', 'xmin', 'xmax', 'ymin', 'ymax', 'label', 'prob']
-DEFAULT_CONFIDENCE = 0.4
-DEFAULT_FILTER_AREA = 22680
-DEFAULT_INFERENCE_COUNT = 1
-DEFAULT_IMAGE_FORMAT = ".jpg"
 
 
 def create_dir_if_not_exists(path):
