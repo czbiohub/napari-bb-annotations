@@ -52,8 +52,12 @@ def napari_get_reader(path):
         path = path[0]
 
     # if we know we cannot read the file, we immediately return None.
-    if not os.path.splitext(path)[1].lower() in VIDEO_EXTS:
+    ext = os.path.splitext(path)[1].lower()
+    print(ext)
+    print(path)
+    if ext not in VIDEO_EXTS or ext != "":
         return None
+    print(path)
 
     assert os.path.exists(path)
     return reader_function
@@ -95,6 +99,7 @@ def reader_function(path):
     for format_of_files in VIDEO_EXTS:
         if path.endswith(format_of_files):
             video_file = True
+    print(video_file)
     if video_file:
         path = convert_video(path)
     path = path + os.sep if not path.endswith(os.sep) else path
@@ -149,4 +154,5 @@ def reader_function(path):
     layer_list = [
         (stack, metadata, layer_type),
         (None, add_kwargs, "shapes")]
+    print(layer_list)
     return layer_list

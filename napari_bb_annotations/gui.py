@@ -26,7 +26,7 @@ def connect_to_viewer(viewer):
 
     run_segmentation_btn = QPushButton("Run thresholding to find bbs on ALL images")
     run_segmentation_btn.clicked.connect(lambda: run_segmentation_on_images(viewer))
-    run_segmentation_btn.setToolTip("Overwrites other predictions, Per 1 image with 20 bbs takes 40 ms/500 ms depending on Coral TPU connected/only CPU")
+    run_segmentation_btn.setToolTip("Runs otsu thresholding and converting to binary, nd finds bbs")
 
     run_lumi_btn = QPushButton("Tensorflow Predict on CURRENT image")
     run_lumi_btn.clicked.connect(lambda: run_lumi_on_image(viewer))

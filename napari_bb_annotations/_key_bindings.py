@@ -341,7 +341,7 @@ def run_inference_on_images(viewer):
         notification_manager.notification_ready.connect(_append)
 
         show_info('Pressed button for running prediction, takes up to 1s per image')
-    all_files = viewer.layers["image"].metadata["all_files"]
+    all_files = viewer.layers["Image"].metadata["all_files"]
     filename = all_files[0]
     dirname = os.path.dirname(filename)
     inference_metadata_path = os.path.join(
@@ -360,9 +360,9 @@ def run_inference_on_images(viewer):
                 show_info('Already ran tflite prediction, click load')
             logger.info("Already ran tflite prediction")
     if set(already_inferenced) == {False}:
-        box_annotations = viewer.layers["image"].metadata["box_annotations"]
-        model = viewer.layers["image"].metadata["model"]
-        use_tpu = viewer.layers["image"].metadata["edgetpu"]
+        box_annotations = viewer.layers["Image"].metadata["box_annotations"]
+        model = viewer.layers["Image"].metadata["model"]
+        use_tpu = viewer.layers["Image"].metadata["edgetpu"]
 
         labels_txt = os.path.join(dirname, "labels.txt")
         with open(labels_txt, 'w') as f:
@@ -401,7 +401,7 @@ def run_segmentation_on_images(viewer):
 
         show_info('Pressed button for running segmentation')
     # label image regions
-    all_files = viewer.layers["image"].metadata["all_files"]
+    all_files = viewer.layers["Image"].metadata["all_files"]
     dirname = os.path.dirname(filename)
     inference_metadata_path = os.path.join(
         dirname, "inference_metadata.pickle")
@@ -459,7 +459,7 @@ def run_tracking_on_images(viewer):
         notification_manager.notification_ready.connect(_append)
 
         show_info('Pressed button for running tracking')
-    all_files = viewer.layers["image"].metadata["all_files"]
+    all_files = viewer.layers["Image"].metadata["all_files"]
 
     df = centroid_tracker.df_centroid_tracking_rectangles(
         df, MAX_DISAPPEARED_FRAMES, all_files)
@@ -561,8 +561,8 @@ def load_bb_labels_for_image(viewer):
     shapes_layer.text.refresh_text(shapes_layer.properties)
 
 
-def run_inference_on_image(viewer):
-    logger.info("Pressed button to run inference/prediction")
+def run_lumi_on_image(viewer):
+    logger.info("Pressed button to run luminoth prediction")
     image_layer = viewer.layers["Image"]
     metadata = image_layer.metadata
     all_files = metadata["all_files"]
