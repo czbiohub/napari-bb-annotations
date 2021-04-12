@@ -545,7 +545,8 @@ def edit_bb_labels(viewer):
         current_properties['box_label'] = np.asarray([new_label])
         shapes_layer.current_properties = current_properties
         table_widget.clear()
-        # set the shapes layer mode back to pan/zoom
+        table_widget.close_window()
+        # set the shapes layer mode back to rectangle
         shapes_layer.mode = 'add_rectangle'
 
     table_widget.native.itemChanged.connect(on_item_changed)

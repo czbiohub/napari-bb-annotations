@@ -44,4 +44,4 @@ dependencies:
   - pip:
     - tensorflow==1.13.2
     - git+git://github.com/czbiohub/luminoth-uv-imaging.git@6a5115c395c915a4f8390732182e5c32d0c30794
-    - git+git://github.com/napari/napari.git@866848d35d039c098b45e8d6f12eae0924633347 # master - Tested for only until April 4th commit of master
+    - git+git://github.com/napari/napari.git@15d403a80d88e49ced5867b902f02e1601f1227e # master - Tested for only until April 12th commit of master
