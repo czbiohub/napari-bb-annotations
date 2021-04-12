@@ -3,7 +3,7 @@ try:
 except ImportError:
     __version__ = "unknown"
 
-from .io_hooks import napari_get_reader
+from ._reader import napari_get_reader
 from . import _key_bindings
 
 __all__ = ["napari_get_reader"]

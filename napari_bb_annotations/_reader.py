@@ -75,6 +75,7 @@ def convert_video(path):
     return output_frames_path
 
 
+@napari_hook_implementation
 def reader_function(path):
     """Take a path or list of paths and return a list of LayerData tuples.
     Readers are expected to return data as a list of tuples, where each tuple
@@ -154,5 +155,4 @@ def reader_function(path):
     layer_list = [
         (stack, metadata, layer_type),
         (None, add_kwargs, "shapes")]
-    print(layer_list)
     return layer_list

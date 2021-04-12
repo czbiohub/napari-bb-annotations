@@ -20,7 +20,7 @@ from napari.utils.notifications import (
 )
 from skimage.io import imread
 from skimage.filters import threshold_otsu
-from skimage.measure import label, regionprops
+import skimage.measure
 
 import napari_bb_annotations.centroid_tracker as centroid_tracker
 
@@ -165,6 +165,7 @@ def update_summary_table(shapes_layer, image_layer):
     table_widget = Table(value=split_dict)
     label_property = "box_label"
     label_menu = ComboBox(label='text label', choices=BOX_ANNOTATIONS)
+    cell_id_property = "unique_cell_id"
 
     def update_table_on_label_change(event):
         """This is a callback function that updates the summary table when
@@ -172,26 +173,46 @@ def update_summary_table(shapes_layer, image_layer):
         moving to next image or at the end of stack
         """
         new_label = str(shapes_layer.current_properties[label_property][0])
+        current_cell_id = str(shapes_layer.current_properties[cell_id_property][0])
         if new_label != label_menu.value:
-            box_labels = shapes_layer.properties["box_label"].tolist()
+            box_labels = shapes_layer.properties[label_property].tolist()
+            cell_ids = shapes_layer.properties[cell_id_property].tolist()
+            unique_cell_labels = {}
+            for index, cell_id in enumerate(cell_ids):
+                if cell_id == current_cell_id:
+                    box_labels[index] = new_label
+            shapes_layer.properties[label_property] = np.array(box_labels)
+            shapes_layer.text.refresh_text(shapes_layer.properties)
             if new_label not in BOX_ANNOTATIONS:
                 new_labels = image_layer.metadata["new_labels"]
                 new_labels.append(new_label)
                 image_layer.metadata["new_labels"] = new_labels
-                index = sorted(BOX_ANNOTATIONS + [new_label])
-                data = [[box_labels.count(label)] for label in index]
+                tuple_list = [
+                    tuple(
+                        (ids[index], labels[index])) for index in range(
+                        len(cell_ids))]
+                unique_cell_id_labels = list(set(tuple_list))
+                index = BOX_ANNOTATIONS + [new_label]
+                unique_cell_labels = [i[1] for i in unique_cell_id_labels]
+                data = [[unique_cell_labels.count(label)] for label in index]
                 split_dict = {
                     "data": data,
                     "index": tuple(index),
                     "columns": ("c"),
                 }
             else:
-                unique_labels = np.unique(
-                    shapes_layer.properties['box_label']).tolist()
-                data = [[box_labels.count(label)] for label in unique_labels]
+                index = sorted(BOX_ANNOTATIONS)
+                tuple_list = [
+                    tuple(
+                        (ids[index], labels[index])) for index in range(
+                        len(cell_ids))]
+                unique_cell_id_labels = list(set(tuple_list))
+                index = BOX_ANNOTATIONS + [new_label]
+                unique_cell_labels = [i[1] for i in unique_cell_id_labels]
+                data = [[unique_cell_labels.count(label)] for label in index]
                 split_dict = {
                     "data": data,
-                    "index": tuple(unique_labels),
+                    "index": tuple(index),
                     "columns": ("c"),
                 }
             table_widget.value = split_dict
@@ -199,13 +220,17 @@ def update_summary_table(shapes_layer, image_layer):
         update_table_on_label_change)
 
     def update_table_on_coordinates_change(event):
-        unique_labels = np.unique(
-            shapes_layer.properties['box_label']).tolist()
-        box_labels = shapes_layer.properties["box_label"].tolist()
-        data = [[box_labels.count(label)] for label in unique_labels]
+        tuple_list = [
+            tuple(
+                (ids[index], labels[index])) for index in range(
+                len(cell_ids))]
+        unique_cell_id_labels = list(set(tuple_list))
+        index = sorted(BOX_ANNOTATIONS + [new_label])
+        unique_cell_labels = [i[1] for i in unique_cell_id_labels]
+        data = [[unique_cell_labels.count(label)] for label in BOX_ANNOTATIONS]
         split_dict = {
             "data": data,
-            "index": tuple(unique_labels),
+            "index": tuple(BOX_ANNOTATIONS),
             "columns": ("c"),
         }
         table_widget.value = split_dict
@@ -402,7 +427,7 @@ def run_segmentation_on_images(viewer):
         show_info('Pressed button for running segmentation')
     # label image regions
     all_files = viewer.layers["Image"].metadata["all_files"]
-    dirname = os.path.dirname(filename)
+    dirname = os.path.dirname(all_files[0])
     inference_metadata_path = os.path.join(
         dirname, "inference_metadata.pickle")
     already_inferenced = [False] * len(all_files)
@@ -419,22 +444,19 @@ def run_segmentation_on_images(viewer):
                 show_info('Already ran threshold prediction, click load')
             logger.info("Already ran threshold prediction")
     if set(already_inferenced) == {False}:
-        for path in all_files:
-            numpy_image = imread(path)[:, :, 0]
+        df = pd.DataFrame(columns=LUMI_CSV_COLUMNS)
+        for file_path in all_files:
+            numpy_image = imread(file_path)
             thresholded_image = np.zeros(
                 (numpy_image.shape[0], numpy_image.shape[1]), dtype=np.uint8)
             thresh_value = threshold_otsu(numpy_image)
             thresholded_image[numpy_image < thresh_value] = 255
-            label_image = label(thresholded_image)
-            df = pd.DataFrame(columns=LUMI_CSV_COLUMNS)
-            height, width = numpy_image.shape[:2]
+            label_image = skimage.measure.label(thresholded_image)
 
-            for region in regionprops(label_image):
+            for region in skimage.measure.regionprops(label_image):
                 # take regions with large enough areas
-                if region.area >= 1000 and region.area <= 3500:
-                    # draw rectangle around segmented coins
-                    xmin, ymin, xmax, ymax = region.bbox
-                    label = labels[index]
+                if region.area >= 1000 and region.area <= 8000:
+                    ymin, xmin, ymax, xmax = region.bbox
                     df = df.append(
                         {'image_id': file_path,
                          'xmin': int(xmin),
@@ -451,7 +473,6 @@ def run_segmentation_on_images(viewer):
 
 def run_tracking_on_images(viewer):
     logger.info("Pressed button for running tracking")
-    # TODO Update summary table based on tracking
     with notification_manager:
         # save all of the events that get emitted
         store: List[Notification] = []   # noqa
@@ -549,6 +570,7 @@ def load_bb_labels_for_image(viewer):
         y2 = row.ymax
         label = row.label
         image_id = row.image_id
+        cell_id = row.unique_cell_ids
         z = all_files.index(image_id)
         bbox_rect = np.array(
             [[z, y1, x1], [z, y2, x1], [z, y2, x2], [z, y1, x2]]
