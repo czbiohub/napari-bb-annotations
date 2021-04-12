@@ -10,4 +10,4 @@ IMAGE_FORMATS = [".png", ".tiff", ".tif", ".jpg", ".jpeg"]
 LUMI_CSV_COLUMNS = [
     'image_id', 'xmin', 'xmax', 'ymin', 'ymax',
     'label', 'prob', "unique_cell_id"]
-EDGE_COLOR_CYCLE = ['GREEN', 'CYAN', 'BLUE', 'RED']
+EDGE_COLOR_CYCLE = ['green', 'cyan', 'blue', 'red']

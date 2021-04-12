@@ -25,6 +25,10 @@ from napari_bb_annotations.constants_lumi import (
 VIDEO_EXTS = [".avi", ".m4v", ".mkv", ".mp4"]
 
 
+def scale_to_uint8(image):
+    return ((image - image.min()) / (image.max() - image.min()) * 255).astype(np.uint8)
+
+
 def create_dir_if_not_exists(path):
     if not os.path.exists(path):
         os.makedirs(path)
@@ -50,15 +54,6 @@ def napari_get_reader(path):
         # if it is a list, it is assumed to be an image stack...
         # so we are only going to look at the first file.
         path = path[0]
-
-    # if we know we cannot read the file, we immediately return None.
-    ext = os.path.splitext(path)[1].lower()
-    print(ext)
-    print(path)
-    if ext not in VIDEO_EXTS or ext != "":
-        return None
-    print(path)
-
     assert os.path.exists(path)
     return reader_function
 
@@ -100,7 +95,6 @@ def reader_function(path):
     for format_of_files in VIDEO_EXTS:
         if path.endswith(format_of_files):
             video_file = True
-    print(video_file)
     if video_file:
         path = convert_video(path)
     path = path + os.sep if not path.endswith(os.sep) else path
@@ -123,7 +117,7 @@ def reader_function(path):
     else:
         stack = np.zeros((total_files, shape[0], shape[1]), dtype=np.uint8)
     for i in range(total_files):
-        stack[i] = imread(all_files[i])
+        stack[i] = scale_to_uint8(imread(all_files[i]))
 
     layer_type = "image"  # optional, default is "image"
     num_files = len(all_files)
@@ -149,7 +143,7 @@ def reader_function(path):
     add_kwargs = dict(
         face_color="black", edge_color='box_label',
         edge_color_cycle=EDGE_COLOR_CYCLE,
-        properties={"box_label": BOX_ANNOTATIONS, "unique_cell_id": [0]},
+        properties={"box_label": BOX_ANNOTATIONS, "unique_cell_id": [0, 0, 0, 0]},
         ndim=3,
         text=text_kwargs, name="Shapes", opacity=0.5)
     layer_list = [
