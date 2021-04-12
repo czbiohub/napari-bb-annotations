@@ -353,6 +353,8 @@ def load_bb_labels(viewer):
         shapes_layer.current_properties["box_label"] = np.array(labels)
         shapes_layer.current_properties["unique_cell_id"] = np.array([0] * len(labels))
         shapes_layer.data = bboxes
+        shapes_layer.properties["box_label"] = np.array(labels)
+        shapes_layer.properties["unique_cell_id"] = np.array([0] * len(labels))
         shapes_layer.text.refresh_text(shapes_layer.properties)
     update_layers(viewer)
 
@@ -386,7 +388,7 @@ def run_inference_on_images(viewer):
             logger.info("Already ran tflite prediction")
     if set(already_inferenced) == {False}:
         box_annotations = viewer.layers["Image"].metadata["box_annotations"]
-        model = viewer.layers["Image"].metadata["model"]
+        model = viewer.layers["Image"].metadata["tflite_model"]
         use_tpu = viewer.layers["Image"].metadata["edgetpu"]
 
         labels_txt = os.path.join(dirname, "labels.txt")
@@ -395,12 +397,11 @@ def run_inference_on_images(viewer):
                 f.write("{} {}\n".format(index, label))
 
         format_of_files = os.path.splitext(filename)[1]
-        inferenced_list = [True] * len(all_files)
-        viewer.layers["Image"].metadata["tflite_inferenced"] = inferenced_list
-        metadata = {"tflite_inferenced": inferenced_list}
-        pickle_save(inference_metadata_path, metadata)
+        saved_model_path = os.path.join(dirname, "output_tflite_graph.tflite")
+        subprocess.check_call(
+            "curl {} -o {}".format(model, saved_model_path), shell=True)
         detect_images(
-            model, use_tpu, dirname, format_of_files,
+            saved_model_path, use_tpu, dirname, format_of_files,
             labels_txt, DEFAULT_CONFIDENCE, dirname,
             DEFAULT_INFERENCE_COUNT, False)
         df = pd.DataFrame(columns=LUMI_CSV_COLUMNS)
@@ -414,6 +415,10 @@ def run_inference_on_images(viewer):
                  'label': "healthy",
                  }, ignore_index=True)
         df.to_csv(os.path.join(dirname, "bb_labels.csv"), index=False)
+        inferenced_list = [True] * len(all_files)
+        viewer.layers["Image"].metadata["tflite_inferenced"] = inferenced_list
+        metadata = {"tflite_inferenced": inferenced_list}
+        pickle_save(inference_metadata_path, metadata)
 
 
 def run_segmentation_on_images(viewer):
@@ -583,6 +588,8 @@ def load_bb_labels_for_image(viewer):
     shapes_layer.current_properties["box_label"] = np.array(labels)
     shapes_layer.current_properties["unique_cell_id"] = np.array([0] * len(labels))
     shapes_layer.data = bboxes
+    shapes_layer.properties["box_label"] = np.array(labels)
+    shapes_layer.properties["unique_cell_id"] = np.array([0] * len(labels))
     shapes_layer.text.refresh_text(shapes_layer.properties)
 
 

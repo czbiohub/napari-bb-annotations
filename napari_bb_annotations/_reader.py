@@ -19,7 +19,8 @@ from skimage.io import imread
 
 from napari_plugin_engine import napari_hook_implementation
 from napari_bb_annotations.constants_lumi import (
-    BOX_ANNOTATIONS, MODEL, EDGETPU, IMAGE_FORMATS, EDGE_COLOR_CYCLE)
+    BOX_ANNOTATIONS, MODEL, EDGETPU,
+    IMAGE_FORMATS, EDGE_COLOR_CYCLE, TFLITE_MODEL)
 
 
 VIDEO_EXTS = [".avi", ".m4v", ".mkv", ".mp4"]
@@ -132,6 +133,7 @@ def reader_function(path):
         "threshold_inferenced": [False] * num_files,
         "lumi_inferenced": [False] * num_files,
         "model": MODEL,
+        "tflite_model": TFLITE_MODEL,
         "edgetpu": EDGETPU},
         "name": "Image"}
 
