@@ -144,7 +144,6 @@ class CentroidTracker():
             # register each new input centroid as a trackable object
             for col in unused_cols:
                 self.register(input_centroids[col])
-        self.object_ids = object_id
         # return the set of trackable objects
         return self.objects
 
@@ -231,10 +230,12 @@ def df_centroid_tracking_rectangles(df, max_disappeared, all_files):
                     (row.xmin + row.xmax) // 2, (row.ymin + row.ymax) // 2))
                 centroids.append(centroid)
                 cell_indices.append(index)
+                print(cell_indices)
         # update our centroid tracker using the computed set of centroids
         current_cell_ids = centroid_tracker.update(centroids)
-        for cell_idx in cell_indices:
-            unique_cell_ids[cell_idx] + centroid_tracker.object_ids
+        object_id_centroids = list(current_cell_ids.items())
+        for index, cell_idx in enumerate(cell_indices):
+            unique_cell_ids[cell_idx] = object_id_centroids[index][0]
         trajectory_path_graph = update_trajectory_path_graph(
             current_cell_ids,
             trajectory_path_graph,
