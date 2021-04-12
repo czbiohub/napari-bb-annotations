@@ -138,7 +138,7 @@ def reader_function(path):
         "name": "Image"}
 
     text_kwargs = {
-        'text': '{box_label}: {unique_cell_id}%',
+        'text': '{box_label}: {unique_cell_id}',
         'size': 8,
         'color': 'green'
     }
@@ -146,7 +146,6 @@ def reader_function(path):
         face_color="black",
         edge_color='box_label',
         edge_color_cycle=EDGE_COLOR_CYCLE,
-        edge_color_mode='cycle',
         properties={"box_label": BOX_ANNOTATIONS, "unique_cell_id": [0]},
         ndim=3,
         text=text_kwargs, name="Shapes", opacity=0.5)

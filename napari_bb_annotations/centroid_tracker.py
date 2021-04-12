@@ -227,8 +227,8 @@ def df_centroid_tracking_rectangles(df, max_disappeared, all_files):
         cell_indices = []
         for index, row in df.iterrows():
             if row.image_id == image_path:
-                centroid = tuple(
-                    (row.xmin + row.xmax) // 2, (row.ymin + row.ymax) // 2)
+                centroid = tuple((
+                    (row.xmin + row.xmax) // 2, (row.ymin + row.ymax) // 2))
                 centroids.append(centroid)
                 cell_indices.append(index)
         # update our centroid tracker using the computed set of centroids
