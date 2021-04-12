@@ -141,8 +141,10 @@ def reader_function(path):
         'color': 'green'
     }
     add_kwargs = dict(
-        face_color="black", edge_color='box_label',
+        face_color="black",
+        edge_color='box_label',
         edge_color_cycle=EDGE_COLOR_CYCLE,
+        edge_color_mode='cycle',
         properties={"box_label": BOX_ANNOTATIONS, "unique_cell_id": [0]},
         ndim=3,
         text=text_kwargs, name="Shapes", opacity=0.5)

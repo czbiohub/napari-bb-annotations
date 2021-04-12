@@ -350,9 +350,9 @@ def load_bb_labels(viewer):
             bboxes.append(bbox_rect)
             labels.append(label)
         viewer.layers["Image"].metadata["loaded"] = True
+        shapes_layer.current_properties["box_label"] = np.array(labels)
+        shapes_layer.current_properties["unique_cell_id"] = np.array([0] * len(labels))
         shapes_layer.data = bboxes
-        shapes_layer.properties["box_label"] = np.array(labels)
-        shapes_layer.properties["unique_cell_id"] = np.array([0] * len(labels))
         shapes_layer.text.refresh_text(shapes_layer.properties)
     update_layers(viewer)
 
@@ -580,10 +580,10 @@ def load_bb_labels_for_image(viewer):
         )
         bboxes.append(bbox_rect)
         labels.append(label)
-        shapes_layer.data = bboxes
-        shapes_layer.properties["box_label"] = np.array(labels)
-        shapes_layer.properties["unique_cell_id"] = np.array([0] * len(labels))
-        shapes_layer.text.refresh_text(shapes_layer.properties)
+    shapes_layer.current_properties["box_label"] = np.array(labels)
+    shapes_layer.current_properties["unique_cell_id"] = np.array([0] * len(labels))
+    shapes_layer.data = bboxes
+    shapes_layer.text.refresh_text(shapes_layer.properties)
 
 
 def run_lumi_on_image(viewer):
