@@ -143,7 +143,7 @@ def reader_function(path):
     add_kwargs = dict(
         face_color="black", edge_color='box_label',
         edge_color_cycle=EDGE_COLOR_CYCLE,
-        properties={"box_label": BOX_ANNOTATIONS, "unique_cell_id": [0, 0, 0, 0]},
+        properties={"box_label": BOX_ANNOTATIONS, "unique_cell_id": [0]},
         ndim=3,
         text=text_kwargs, name="Shapes", opacity=0.5)
     layer_list = [

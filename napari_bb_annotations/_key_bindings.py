@@ -174,15 +174,15 @@ def update_summary_table(shapes_layer, image_layer):
         """
         new_label = str(shapes_layer.current_properties[label_property][0])
         current_cell_id = str(shapes_layer.current_properties[cell_id_property][0])
+        box_labels = shapes_layer.properties[label_property].tolist()
+        cell_ids = shapes_layer.properties[cell_id_property].tolist()
+        unique_cell_labels = {}
+        for index, cell_id in enumerate(cell_ids):
+            if cell_id == current_cell_id:
+                box_labels[index] = new_label
+        shapes_layer.properties[label_property] = np.array(box_labels)
+        shapes_layer.text.refresh_text(shapes_layer.properties)
         if new_label != label_menu.value:
-            box_labels = shapes_layer.properties[label_property].tolist()
-            cell_ids = shapes_layer.properties[cell_id_property].tolist()
-            unique_cell_labels = {}
-            for index, cell_id in enumerate(cell_ids):
-                if cell_id == current_cell_id:
-                    box_labels[index] = new_label
-            shapes_layer.properties[label_property] = np.array(box_labels)
-            shapes_layer.text.refresh_text(shapes_layer.properties)
             if new_label not in BOX_ANNOTATIONS:
                 new_labels = image_layer.metadata["new_labels"]
                 new_labels.append(new_label)
@@ -333,9 +333,9 @@ def load_bb_labels(viewer):
     csv_path = os.path.join(dirname, "bb_labels.csv")
     if os.path.exists(csv_path):
         df = pd.read_csv(csv_path)
-        shape = viewer.layers["Shapes"]
-        bboxes = shape.data
-        labels = shape.properties["box_label"].tolist()
+        shapes_layer = viewer.layers["Shapes"]
+        bboxes = shapes_layer.data
+        labels = shapes_layer.properties["box_label"].tolist()
         for index, row in df.iterrows():
             x1 = row.xmin
             x2 = row.xmax
@@ -349,10 +349,10 @@ def load_bb_labels(viewer):
             )
             bboxes.append(bbox_rect)
             labels.append(label)
-        shapes_layer = viewer.layers["Shapes"]
-        shapes_layer.data = bboxes
         viewer.layers["Image"].metadata["loaded"] = True
+        shapes_layer.data = bboxes
         shapes_layer.properties["box_label"] = np.array(labels)
+        shapes_layer.properties["unique_cell_id"] = np.array([0] * len(labels))
         shapes_layer.text.refresh_text(shapes_layer.properties)
     update_layers(viewer)
 
@@ -468,6 +468,7 @@ def run_segmentation_on_images(viewer):
         inferenced_list = [True] * len(all_files)
         viewer.layers["Image"].metadata["threshold_inferenced"] = inferenced_list
         metadata = {"threshold_inferenced": inferenced_list}
+        pickle_save(inference_metadata_path, metadata)
         df.to_csv(os.path.join(dirname, "bb_labels.csv"), index=False)
 
 
@@ -481,7 +482,8 @@ def run_tracking_on_images(viewer):
 
         show_info('Pressed button for running tracking')
     all_files = viewer.layers["Image"].metadata["all_files"]
-
+    dirname = os.path.dirname(all_files[0])
+    df = pd.read_csv(os.path.join(dirname, "bb_labels.csv"), index_col=False)
     df = centroid_tracker.df_centroid_tracking_rectangles(
         df, MAX_DISAPPEARED_FRAMES, all_files)
     viewer.layers['Shapes'].properties["unique_cell_id"] = df["unique_cell_id"].tolist()
@@ -560,9 +562,9 @@ def load_bb_labels_for_image(viewer):
     df = pd.read_csv(os.path.join(dirname, "bb_labels.csv"), index_col=False)
     # Filter out the df for all the bounding boxes in one image
     tmp_df = df[df.image_id == filename]
-    shape = viewer.layers["Shapes"]
-    bboxes = shape.data
-    labels = shape.properties["box_label"].tolist()
+    shapes_layer = viewer.layers["Shapes"]
+    bboxes = shapes_layer.data
+    labels = shapes_layer.properties["box_label"].tolist()
     for index, row in tmp_df.iterrows():
         x1 = row.xmin
         x2 = row.xmax
@@ -577,10 +579,10 @@ def load_bb_labels_for_image(viewer):
         )
         bboxes.append(bbox_rect)
         labels.append(label)
-    shapes_layer = viewer.layers["Shapes"]
-    shapes_layer.data = bboxes
-    shapes_layer.properties["box_label"] = np.array(labels)
-    shapes_layer.text.refresh_text(shapes_layer.properties)
+        shapes_layer.data = bboxes
+        shapes_layer.properties["box_label"] = np.array(labels)
+        shapes_layer.properties["unique_cell_id"] = np.array([0] * len(labels))
+        shapes_layer.text.refresh_text(shapes_layer.properties)
 
 
 def run_lumi_on_image(viewer):
