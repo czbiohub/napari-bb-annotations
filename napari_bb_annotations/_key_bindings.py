@@ -189,7 +189,7 @@ def update_summary_table(shapes_layer, image_layer):
                 image_layer.metadata["new_labels"] = new_labels
                 tuple_list = [
                     tuple(
-                        (ids[index], labels[index])) for index in range(
+                        (cell_ids[index], box_labels[index])) for index in range(
                         len(cell_ids))]
                 unique_cell_id_labels = list(set(tuple_list))
                 index = BOX_ANNOTATIONS + [new_label]
@@ -204,7 +204,7 @@ def update_summary_table(shapes_layer, image_layer):
                 index = sorted(BOX_ANNOTATIONS)
                 tuple_list = [
                     tuple(
-                        (ids[index], labels[index])) for index in range(
+                        (cell_ids[index], box_labels[index])) for index in range(
                         len(cell_ids))]
                 unique_cell_id_labels = list(set(tuple_list))
                 index = BOX_ANNOTATIONS + [new_label]
@@ -220,9 +220,11 @@ def update_summary_table(shapes_layer, image_layer):
         update_table_on_label_change)
 
     def update_table_on_coordinates_change(event):
+        box_labels = shapes_layer.properties[label_property].tolist()
+        cell_ids = shapes_layer.properties[cell_id_property].tolist()
         tuple_list = [
             tuple(
-                (ids[index], labels[index])) for index in range(
+                (cell_ids[index], box_labels[index])) for index in range(
                 len(cell_ids))]
         unique_cell_id_labels = list(set(tuple_list))
         index = sorted(BOX_ANNOTATIONS + [new_label])
