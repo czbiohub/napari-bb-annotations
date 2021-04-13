@@ -2,6 +2,7 @@ import datetime
 import logging
 import os
 import pickle
+import subprocess
 from typing import List
 
 import numpy as np
@@ -11,7 +12,8 @@ from PIL import Image, ImageDraw
 from napari_bb_annotations.constants_lumi import (
     BOX_ANNOTATIONS, LUMI_CSV_COLUMNS)
 from napari_bb_annotations.run_inference import (
-    detect_images)
+    detect_images, DEFAULT_CONFIDENCE, DEFAULT_INFERENCE_COUNT,
+    DEFAULT_FILTER_AREA)
 from napari.utils.notifications import (
     Notification,
     notification_manager,
@@ -369,7 +371,8 @@ def run_inference_on_images(viewer):
     already_inferenced = [False] * len(all_files)
     if os.path.exists(inference_metadata_path) and not viewer.layers["Image"].metadata["loaded"]:
         inference_metadata = pickle_load(inference_metadata_path)
-        already_inferenced = inference_metadata["tflite_inferenced"]
+        if "tflite_inferenced" in inference_metadata:
+            already_inferenced = inference_metadata["tflite_inferenced"]
         if set(already_inferenced) == {True}:
             with notification_manager:
                 # save all of the events that get emitted
@@ -391,11 +394,12 @@ def run_inference_on_images(viewer):
         format_of_files = os.path.splitext(filename)[1]
         saved_model_path = os.path.join(dirname, "output_tflite_graph.tflite")
         subprocess.check_call(
-            "curl {} -o {}".format(model, saved_model_path), shell=True)
+            "curl {} --output {}".format(model, saved_model_path), shell=True)
         detect_images(
             saved_model_path, use_tpu, dirname, format_of_files,
             labels_txt, DEFAULT_CONFIDENCE, dirname,
-            DEFAULT_INFERENCE_COUNT, False)
+            DEFAULT_INFERENCE_COUNT, False,
+            DEFAULT_FILTER_AREA, True)
         df = pd.DataFrame(columns=LUMI_CSV_COLUMNS)
         for index, row in df.iterrows():
             df = df.append(
@@ -429,7 +433,8 @@ def run_segmentation_on_images(viewer):
     already_inferenced = [False] * len(all_files)
     if os.path.exists(inference_metadata_path):
         inference_metadata = pickle_load(inference_metadata_path)
-        already_inferenced = inference_metadata["threshold_inferenced"]
+        if "threshold_inferenced" in inference_metadata:
+            already_inferenced = inference_metadata["threshold_inferenced"]
         if set(already_inferenced) == {True}:
             with notification_manager:
                 # save all of the events that get emitted
