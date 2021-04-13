@@ -4,7 +4,6 @@ import os
 import pickle
 from typing import List
 
-import luminoth.predict
 import numpy as np
 import pandas as pd
 from magicgui.widgets import ComboBox, Container, Table
@@ -609,6 +608,7 @@ def run_lumi_on_image(viewer):
         classes_json = None
         pixel_distance = 0
         new_labels = None
+        import luminoth.predict
         luminoth.predict.predict_function(
             path_or_dir, config_files, checkpoint, override_params,
             output_path, save_media_to, min_prob, max_prob,

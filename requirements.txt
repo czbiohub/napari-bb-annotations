@@ -19,6 +19,7 @@ qtconsole>=4.5.1
 qtpy>=1.7.0
 scipy>=1.2.0
 scikit-image>=0.17.2
+tensorflow==1.13.2
 toolz>=0.10.0
 vispy>=0.6.4
 wrapt>=1.11.1

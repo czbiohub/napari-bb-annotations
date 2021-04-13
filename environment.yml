@@ -43,5 +43,5 @@ dependencies:
   - typing_extensions
   - pip:
     - tensorflow==1.13.2
-    - git+git://github.com/czbiohub/luminoth-uv-imaging.git@6a5115c395c915a4f8390732182e5c32d0c30794
-    - git+git://github.com/napari/napari.git@c799d11049830ff0263df96cc1425770ae7f3def # master - Tested for only until April 12th commit of master
+    - git+git://github.com/czbiohub/luminoth-uv-imaging.git@14f00ab37c9094474f90bc0fcbe36bdc2dfa2936
+    - git+git://github.com/napari/napari.git@c799d11049830ff0263df96cc1425770ae7f3def # master - Tested for only until April 13th commit of master

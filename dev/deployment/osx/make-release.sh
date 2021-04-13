@@ -23,9 +23,9 @@ conda env create -n napari-bb-annotations-release -f environment.yml
 conda activate napari-bb-annotations-release
 ${RELEASE_ENV}/bin/python setup.py install
 conda install -y pyqt
-pip install git+git://github.com/czbiohub/luminoth-uv-imaging.git@6a5115c395c915a4f8390732182e5c32d0c30794 # master - Tested for only until April 4th commit of master
-pip install git+git://github.com/napari/napari.git@c799d11049830ff0263df96cc1425770ae7f3def # master - Tested for only until April 4th commit of master
 pip install https://dl.google.com/coral/python/tflite_runtime-2.1.0.post1-cp37-cp37m-macosx_10_14_x86_64.whl
+pip install git+git://github.com/czbiohub/luminoth-uv-imaging.git@14f00ab37c9094474f90bc0fcbe36bdc2dfa2936 # master - Tested for only until April 13th commit of master
+pip install git+git://github.com/napari/napari.git@c799d11049830ff0263df96cc1425770ae7f3def # master - Tested for only until April 13th commit of master
 lumi predict --help
 
 ${RELEASE_ENV}/bin/python dev/deployment/osx/setup-alias-app.py py2app --alias --dist-dir .  --packages=wx --emulate-shell-environment
