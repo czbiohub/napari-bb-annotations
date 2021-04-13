@@ -13,18 +13,16 @@ from napari_bb_annotations.constants_lumi import (
     BOX_ANNOTATIONS, LUMI_CSV_COLUMNS)
 from napari_bb_annotations.run_inference import (
     detect_images)
+from napari._qt.dialogs.qt_notification import NapariQtNotification
 from napari.utils.notifications import (
     Notification,
+    NotificationSeverity,
     notification_manager,
     show_info,
 )
 from skimage.io import imread
 from skimage.filters import threshold_otsu
 import skimage.measure
-
-import napari_bb_annotations.centroid_tracker as centroid_tracker
-
-MAX_DISAPPEARED_FRAMES = 35
 
 
 def pickle_save(path, metadata_dct):
@@ -51,23 +49,30 @@ logging.basicConfig(
 
 
 def check_bbox(bbox, width, height):
+    error = False
     xmin, ymin, xmax, ymax = bbox[0], bbox[1], bbox[2], bbox[3]
     if xmin > width:
         xmin = width
+        error = True
     if xmin < 0:
         xmin = 0
+        error = True
     if xmax > width:
         xmax = width
+        error = True
     if ymin > height:
         ymin = height
+        error = True
     if ymin < 0:
         ymin = 0
+        error = True
     if ymax > height:
         ymax = height
-    return np.array([xmin, ymin, xmax, ymax])
+        error = True
+    return error, np.array([xmin, ymin, xmax, ymax])
 
 
-def draw_objects(draw, bboxes, labels, cell_ids):
+def draw_objects(draw, bboxes, labels):
     """Draws the bounding box and label for each object."""
     for index, bbox in enumerate(bboxes):
         draw.rectangle([(bbox[0], bbox[1]), (bbox[2], bbox[3])],
@@ -75,12 +80,12 @@ def draw_objects(draw, bboxes, labels, cell_ids):
         label = labels[index]
         if " " not in label:
             draw.text((bbox[0] + 10, bbox[1] + 10),
-                      '{}-cell{}'.format(labels[index], cell_ids[index]),
+                      '{}'.format(labels[index]),
                       fill='red')
         else:
             split1, split2 = label.split(" ")
             draw.text((bbox[0] + 10, bbox[1] + 10),
-                      '{}/n{}-cell{}'.format(split1, split2, cell_ids[index]),
+                      '{}/n{}'.format(split1, split2),
                       fill='red')
 
 
@@ -109,14 +114,12 @@ def get_bbox_obj_detection(bbox):
 
 def create_label_menu(shapes_layer, image_layer):
     """Create a label menu widget that can be added to the napari viewer dock
-
     Parameters:
     -----------
     shapes_layer : napari.layers.Shapes
         a napari shapes layer
     labels : List[str]
         list of the possible text labels values.
-
     Returns:
     --------
     label_widget : magicgui.widgets.Container
@@ -147,15 +150,8 @@ def create_label_menu(shapes_layer, image_layer):
         """
         selected_label = event.value
         current_properties = shapes_layer.current_properties
-        current_properties[label_property] = np.asarray([selected_label])
+        current_properties[label_property] = np.asarray([selected_label], dtype='<U32')
         shapes_layer.current_properties = current_properties
-        box_labels = shapes_layer.properties[label_property].tolist()
-        cell_ids = shapes_layer.properties[cell_id_property].tolist()
-        unique_cell_labels = {}
-        for index, cell_id in enumerate(cell_ids):
-            if cell_id == current_cell_id:
-                box_labels[index] = new_label
-        shapes_layer.properties[label_property] = np.array(box_labels)
         shapes_layer.text.refresh_text(shapes_layer.properties)
 
     label_menu.changed.connect(label_changed)
@@ -166,21 +162,21 @@ def create_label_menu(shapes_layer, image_layer):
 def update_summary_table(shapes_layer, image_layer):
     box_labels = shapes_layer.properties["box_label"].tolist()
     total_sum = len(box_labels)
-    count_labels = []
-    percentage_labels = []
-    for label in BOX_ANNOTATIONS:
-        count_labels.append(box_labels.count(label))
-        percentage_labels.append((count_label * 100) / total_sum)
-    data = [count_labels, percentage_labels]
+    index = BOX_ANNOTATIONS
+    data = []
+    for label in index:
+        count_label = box_labels.count(label)
+        data.append([count_label, round((count_label * 100) / total_sum)])
     split_dict = {
-        "data": [data],
-        "index": tuple(BOX_ANNOTATIONS),
+        "data": data,
+        "index": tuple(index),
         "columns": ("c", "p"),
     }
+    logger.info("{}".format(split_dict))
     table_widget = Table(value=split_dict)
+    table_widget.tooltip = "Edit the label for selected bounding box, Click close button after completing"
     label_property = "box_label"
     label_menu = ComboBox(label='text label', choices=BOX_ANNOTATIONS)
-    cell_id_property = "unique_cell_id"
 
     def update_table_on_label_change(event):
         """This is a callback function that updates the summary table when
@@ -188,88 +184,60 @@ def update_summary_table(shapes_layer, image_layer):
         moving to next image or at the end of stack
         """
         new_label = str(shapes_layer.current_properties[label_property][0])
-        current_cell_id = str(shapes_layer.current_properties[cell_id_property][0])
-        box_labels = shapes_layer.properties[label_property].tolist()
-        cell_ids = shapes_layer.properties[cell_id_property].tolist()
-        unique_cell_labels = {}
-        for index, cell_id in enumerate(cell_ids):
-            if cell_id == current_cell_id:
-                box_labels[index] = new_label
-        shapes_layer.properties[label_property] = np.array(box_labels)
-        shapes_layer.text.refresh_text(shapes_layer.properties)
         if new_label != label_menu.value:
+            box_labels = shapes_layer.properties["box_label"].tolist()
             if new_label not in BOX_ANNOTATIONS:
                 new_labels = image_layer.metadata["new_labels"]
                 new_labels.append(new_label)
                 image_layer.metadata["new_labels"] = new_labels
-                tuple_list = [
-                    tuple(
-                        (cell_ids[index], box_labels[index])) for index in range(
-                        len(cell_ids))]
-                unique_cell_id_labels = list(set(tuple_list))
-                index = sorted(BOX_ANNOTATIONS + [new_label])
-                unique_cell_labels = [i[1] for i in unique_cell_id_labels]
-                count_labels = []
-                percentage_labels = []
-                total_sum = len(unique_cell_labels)
-                for label in BOX_ANNOTATIONS:
-                    count_labels.append(box_labels.count(label))
-                    percentage_labels.append((count_label * 100) / total_sum)
-                data = [count_labels, percentage_labels]
+                data = []
+                total_sum = len(box_labels)
+                index = sorted([new_label] + BOX_ANNOTATIONS)
+                for label in index:
+                    count_label = box_labels.count(label)
+                    data.append([count_label, round((count_label * 100) / total_sum, 2)])
                 split_dict = {
-                    "data": [data],
+                    "data": data,
                     "index": tuple(index),
                     "columns": ("c", "p"),
                 }
+                logger.info("{}".format(split_dict))
+
             else:
-                tuple_list = [
-                    tuple(
-                        (cell_ids[index], box_labels[index])) for index in range(
-                        len(cell_ids))]
-                unique_cell_id_labels = list(set(tuple_list))
-                unique_cell_labels = [i[1] for i in unique_cell_id_labels]
                 index = sorted(np.unique(shapes_layer.properties['box_label']).tolist())
-                index = sorted(index + BOX_ANNOTATIONS)
-                total_sum = len(unique_cell_labels)
-                count_labels = []
-                percentage_labels = []
-                for label in BOX_ANNOTATIONS:
-                    count_labels.append(box_labels.count(label))
-                    percentage_labels.append((count_label * 100) / total_sum)
-                data = [count_labels, percentage_labels]
+                logger.info("{}".format(index))
+                index = sorted(list(set(index + BOX_ANNOTATIONS)))
+                logger.info("{}".format(index))
+                total_sum = len(box_labels)
+                data = []
+                for label in index:
+                    count_label = box_labels.count(label)
+                    data.append([count_label, round((count_label * 100) / total_sum, 2)])
                 split_dict = {
-                    "data": [data],
+                    "data": data,
                     "index": tuple(index),
                     "columns": ("c", "p"),
                 }
+                logger.info("{}".format(split_dict))
             table_widget.value = split_dict
     shapes_layer.events.current_properties.connect(
         update_table_on_label_change)
 
     def update_table_on_coordinates_change(event):
         box_labels = shapes_layer.properties[label_property].tolist()
-        cell_ids = shapes_layer.properties[cell_id_property].tolist()
-        tuple_list = [
-            tuple(
-                (cell_ids[index], box_labels[index])) for index in range(
-                len(cell_ids))]
-        unique_cell_id_labels = list(set(tuple_list))
-        unique_cell_labels = [i[1] for i in unique_cell_id_labels]
         index = sorted(np.unique(shapes_layer.properties['box_label']).tolist())
-        index = sorted(index + BOX_ANNOTATIONS)
-        total_sum = len(unique_cell_labels)
-
-        count_labels = []
-        percentage_labels = []
-        for label in BOX_ANNOTATIONS:
-            count_labels.append(box_labels.count(label))
-            percentage_labels.append((count_label * 100) / total_sum)
-        data = [count_labels, percentage_labels]
+        index = sorted(list(set(index + BOX_ANNOTATIONS)))
+        total_sum = len(box_labels)
+        data = []
+        for label in index:
+            count_label = box_labels.count(label)
+            data.append([count_label, round((count_label * 100) / total_sum, 2)])
         split_dict = {
-            "data": [data],
+            "data": data,
             "index": tuple(index),
             "columns": ("c", "p"),
         }
+        logger.info("{}".format(split_dict))
         table_widget.value = split_dict
 
     shapes_layer.events.set_data.connect(update_table_on_coordinates_change)
@@ -291,7 +259,6 @@ def save_bb_labels(viewer):
     stack = image.data
     bboxes = shape.data
     labels = shape.properties["box_label"].tolist()
-    unique_cell_ids = shape.properties["unique_cell_ids"].tolist()
     save_overlay_path = metadata["save_overlay_path"]
     csv_path = os.path.join(
         os.path.dirname(save_overlay_path), "bb_labels.csv")
@@ -311,32 +278,27 @@ def save_bb_labels(viewer):
         image_at_index = image_at_index.convert('RGB')
         bboxes_converted = []
         labels_for_image = []
-        unique_cell_ids_for_image = []
         for index, bbox in enumerate(bboxes):
             z_index = np.unique((bbox[:, 0])).tolist()
             assert len(z_index) == 1
             if z_index[0] == stack_index:
-                bbox = check_bbox(get_bbox_obj_detection(bbox), width, height)
+                _, bbox = check_bbox(get_bbox_obj_detection(bbox), width, height)
                 label = labels[index]
-                cell_id = unique_cell_ids[index]
                 df = df.append(
                     {'image_id': file_path,
                      'xmin': int(bbox[0]),
                      'ymin': int(bbox[1]),
                      'xmax': int(bbox[2]),
                      'ymax': int(bbox[3]),
-                     'label': label,
-                     "unique_cell_id": cell_id
+                     'label': label
                      }, ignore_index=True)
                 labels_for_image.append(label)
-                unique_cell_ids_for_image.append(cell_id)
                 bboxes_converted.append(bbox)
         if len(bboxes_converted) != 0:
             draw_objects(
                 ImageDraw.Draw(image_at_index),
                 bboxes_converted,
-                labels_for_image,
-                unique_cell_ids_for_image)
+                labels_for_image)
             # save images
             basename = os.path.basename(file_path)
             overlaid_save_name = os.path.join(
@@ -356,13 +318,12 @@ def save_bb_labels(viewer):
 
 def load_bb_labels(viewer):
     logger.info("Pressed load bounding box, labels button")
-    with notification_manager:
-        # save all of the events that get emitted
-        store: List[Notification] = []   # noqa
-        _append = lambda e: store.append(e)  # lambda needed on py3.7  # noqa
-        notification_manager.notification_ready.connect(_append)
-
-        show_info('Pressed load bounding box, labels button')
+    notif = Notification(
+        "Already ran threshold prediction, click load",
+        NotificationSeverity.INFO,
+        actions=[('click', lambda x: None)])
+    NapariQtNotification.show_notification(notif)
+    logger.info("Pressed load bounding box, labels button")
     if viewer.layers["Image"].metadata["loaded"]:
         return
     all_files = viewer.layers["Image"].metadata["all_files"]
@@ -387,24 +348,20 @@ def load_bb_labels(viewer):
             bboxes.append(bbox_rect)
             labels.append(label)
         viewer.layers["Image"].metadata["loaded"] = True
-        shapes_layer.current_properties["box_label"] = np.array(labels)
-        shapes_layer.current_properties["unique_cell_id"] = np.array([0] * len(labels))
+        shapes_layer.current_properties["box_label"] = np.array(labels, dtype='<U32')
         shapes_layer.data = bboxes
-        shapes_layer.properties["box_label"] = np.array(labels)
-        shapes_layer.properties["unique_cell_id"] = np.array([0] * len(labels))
+        shapes_layer.properties["box_label"] = np.array(labels, dtype='<U32')
         shapes_layer.text.refresh_text(shapes_layer.properties)
     update_layers(viewer)
 
 
 def run_inference_on_images(viewer):
     logger.info("Pressed button for running prediction")
-    with notification_manager:
-        # save all of the events that get emitted
-        store: List[Notification] = []   # noqa
-        _append = lambda e: store.append(e)  # lambda needed on py3.7  # noqa
-        notification_manager.notification_ready.connect(_append)
-
-        show_info('Pressed button for running prediction, takes up to 1s per image')
+    notif = Notification(
+        'Pressed button for running prediction, takes up to 1s per image',
+        NotificationSeverity.INFO,
+        actions=[('click', lambda x: None)])
+    NapariQtNotification.show_notification(notif)
     all_files = viewer.layers["Image"].metadata["all_files"]
     filename = all_files[0]
     dirname = os.path.dirname(filename)
@@ -415,13 +372,11 @@ def run_inference_on_images(viewer):
         inference_metadata = pickle_load(inference_metadata_path)
         already_inferenced = inference_metadata["tflite_inferenced"]
         if set(already_inferenced) == {True}:
-            with notification_manager:
-                # save all of the events that get emitted
-                store: List[Notification] = []  # noqa
-                _append = lambda e: store.append(e)  # lambda needed on py3.7  # noqa
-                notification_manager.notification_ready.connect(_append)
-
-                show_info('Already ran tflite prediction, click load')
+            notif = Notification(
+                'Already ran tflite prediction, click load',
+                NotificationSeverity.INFO,
+                actions=[('click', lambda x: None)])
+            NapariQtNotification.show_notification(notif)
             logger.info("Already ran tflite prediction")
     if set(already_inferenced) == {False}:
         box_annotations = viewer.layers["Image"].metadata["box_annotations"]
@@ -460,13 +415,11 @@ def run_inference_on_images(viewer):
 
 def run_segmentation_on_images(viewer):
     logger.info("Pressed button for running segmentation")
-    with notification_manager:
-        # save all of the events that get emitted
-        store: List[Notification] = []   # noqa
-        _append = lambda e: store.append(e)  # lambda needed on py3.7  # noqa
-        notification_manager.notification_ready.connect(_append)
-
-        show_info('Pressed button for running segmentation')
+    notif = Notification(
+        'Pressed button for running segmentation',
+        NotificationSeverity.INFO,
+        actions=[('click', lambda x: None)])
+    NapariQtNotification.show_notification(notif)
     # label image regions
     all_files = viewer.layers["Image"].metadata["all_files"]
     dirname = os.path.dirname(all_files[0])
@@ -477,18 +430,17 @@ def run_segmentation_on_images(viewer):
         inference_metadata = pickle_load(inference_metadata_path)
         already_inferenced = inference_metadata["threshold_inferenced"]
         if set(already_inferenced) == {True}:
-            with notification_manager:
-                # save all of the events that get emitted
-                store: List[Notification] = []  # noqa
-                _append = lambda e: store.append(e)  # lambda needed on py3.7  # noqa
-                notification_manager.notification_ready.connect(_append)
-
-                show_info('Already ran threshold prediction, click load')
-            logger.info("Already ran threshold prediction")
+            notif = Notification(
+                "Already ran threshold prediction, click load",
+                NotificationSeverity.INFO,
+                actions=[('click', lambda x: None)])
+            NapariQtNotification.show_notification(notif)
+            logger.info("Already ran threshold prediction, click load")
     if set(already_inferenced) == {False}:
         df = pd.DataFrame(columns=LUMI_CSV_COLUMNS)
         for file_path in all_files:
             numpy_image = imread(file_path)
+            height, width = numpy_image.shape[:2]
             thresholded_image = np.zeros(
                 (numpy_image.shape[0], numpy_image.shape[1]), dtype=np.uint8)
             thresh_value = threshold_otsu(numpy_image)
@@ -499,38 +451,20 @@ def run_segmentation_on_images(viewer):
                 # take regions with large enough areas
                 if region.area >= 1000 and region.area <= 8000:
                     ymin, xmin, ymax, xmax = region.bbox
-                    df = df.append(
-                        {'image_id': file_path,
-                         'xmin': int(xmin),
-                         'ymin': int(ymin),
-                         'xmax': int(xmax),
-                         'ymax': int(ymax),
-                         'label': "healthy",
-                         }, ignore_index=True)
+                    if not check_bbox([xmin, ymin, xmax, ymax], width, height)[0]:
+                        df = df.append(
+                            {'image_id': file_path,
+                             'xmin': int(xmin),
+                             'ymin': int(ymin),
+                             'xmax': int(xmax),
+                             'ymax': int(ymax),
+                             'label': "healthy",
+                             }, ignore_index=True)
         inferenced_list = [True] * len(all_files)
         viewer.layers["Image"].metadata["threshold_inferenced"] = inferenced_list
         metadata = {"threshold_inferenced": inferenced_list}
         pickle_save(inference_metadata_path, metadata)
         df.to_csv(os.path.join(dirname, "bb_labels.csv"), index=False)
-
-
-def run_tracking_on_images(viewer):
-    logger.info("Pressed button for running tracking")
-    with notification_manager:
-        # save all of the events that get emitted
-        store: List[Notification] = []   # noqa
-        _append = lambda e: store.append(e)  # lambda needed on py3.7  # noqa
-        notification_manager.notification_ready.connect(_append)
-
-        show_info('Pressed button for running tracking')
-    all_files = viewer.layers["Image"].metadata["all_files"]
-    dirname = os.path.dirname(all_files[0])
-    df = pd.read_csv(os.path.join(dirname, "bb_labels.csv"), index_col=False)
-    df = centroid_tracker.df_centroid_tracking_rectangles(
-        df, MAX_DISAPPEARED_FRAMES, all_files)
-    shapes_layer = viewer.layers['Shapes']
-    shapes_layer.properties["unique_cell_id"] = np.array(df["unique_cell_id"].tolist())
-    shapes_layer.text.refresh_text(shapes_layer.properties)
 
 
 def update_layers(viewer):
@@ -586,10 +520,10 @@ def edit_bb_labels(viewer):
         new_label = item.data(table_widget._widget._DATA_ROLE)
         new_label = new_label.capitalize()
         current_properties = shapes_layer.current_properties
-        current_properties['box_label'] = np.asarray([new_label])
+        current_properties['box_label'] = np.asarray([new_label], dtype='<U32')
         shapes_layer.current_properties = current_properties
         table_widget.clear()
-        table_widget.close_window()
+        table_widget.visible = False
         # set the shapes layer mode back to rectangle
         shapes_layer.mode = 'add_rectangle'
 
@@ -617,18 +551,15 @@ def load_bb_labels_for_image(viewer):
         y2 = row.ymax
         label = row.label
         image_id = row.image_id
-        cell_id = row.unique_cell_ids
         z = all_files.index(image_id)
         bbox_rect = np.array(
             [[z, y1, x1], [z, y2, x1], [z, y2, x2], [z, y1, x2]]
         )
         bboxes.append(bbox_rect)
         labels.append(label)
-    shapes_layer.current_properties["box_label"] = np.array(labels)
-    shapes_layer.current_properties["unique_cell_id"] = np.array([0] * len(labels))
+    shapes_layer.current_properties["box_label"] = np.array(labels, dtype='<U32')
     shapes_layer.data = bboxes
-    shapes_layer.properties["box_label"] = np.array(labels)
-    shapes_layer.properties["unique_cell_id"] = np.array([0] * len(labels))
+    shapes_layer.properties["box_label"] = np.array(labels, dtype='<U32')
     shapes_layer.text.refresh_text(shapes_layer.properties)
 
 

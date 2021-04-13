@@ -138,15 +138,16 @@ def reader_function(path):
         "name": "Image"}
 
     text_kwargs = {
-        'text': '{box_label}: {unique_cell_id}',
+        'text': 'box_label',
         'size': 8,
         'color': 'green'
     }
     add_kwargs = dict(
         face_color="black",
         edge_color='box_label',
+        edge_width=3,
         edge_color_cycle=EDGE_COLOR_CYCLE,
-        properties={"box_label": BOX_ANNOTATIONS, "unique_cell_id": [0]},
+        properties={"box_label": BOX_ANNOTATIONS},
         ndim=3,
         text=text_kwargs, name="Shapes", opacity=0.5)
     layer_list = [
