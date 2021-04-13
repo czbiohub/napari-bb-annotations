@@ -362,7 +362,6 @@ def run_inference_on_images(viewer):
         _append = lambda e: store.append(e)  # lambda needed on py3.7  # noqa
         notification_manager.notification_ready.connect(_append)
         show_info('Pressed button for running prediction using tflite model')
-    NapariQtNotification.show_notification(notif)
     all_files = viewer.layers["Image"].metadata["all_files"]
     filename = all_files[0]
     dirname = os.path.dirname(filename)
@@ -433,11 +432,12 @@ def run_segmentation_on_images(viewer):
         inference_metadata = pickle_load(inference_metadata_path)
         already_inferenced = inference_metadata["threshold_inferenced"]
         if set(already_inferenced) == {True}:
-            notif = Notification(
-                "Already ran threshold prediction, click load",
-                NotificationSeverity.INFO,
-                actions=[('click', lambda x: None)])
-            NapariQtNotification.show_notification(notif)
+            with notification_manager:
+                # save all of the events that get emitted
+                store: List[Notification] = []   # noqa
+                _append = lambda e: store.append(e)  # lambda needed on py3.7  # noqa
+                notification_manager.notification_ready.connect(_append)
+                show_info('Already ran threshold prediction, click load')
             logger.info("Already ran threshold prediction, click load")
     if set(already_inferenced) == {False}:
         df = pd.DataFrame(columns=LUMI_CSV_COLUMNS)
@@ -627,6 +627,5 @@ def run_lumi_on_image(viewer):
             logger.error("Prediction unsuccesful")
             e.args += ('Prediction unsuccesful')
             notif = ErrorNotification(AssertionError)
-            dialog = NapariQtNotification.from_notification(notif)
     else:
         load_bb_labels_for_image(viewer)
