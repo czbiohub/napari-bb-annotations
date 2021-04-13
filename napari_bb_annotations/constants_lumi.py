@@ -11,4 +11,4 @@ LUMI_CSV_COLUMNS = [
     'image_id', 'xmin', 'xmax', 'ymin', 'ymax',
     'label', 'prob', "unique_cell_id"]
 EDGE_COLOR_CYCLE = ['green', 'magenta', 'blue', 'red']
-TFLITE_MODEL = "https://github.com/czbiohub/napari-bb-annotations/raw/pranathi-tflite/data/output_tflite_graph.tflite"
+TFLITE_MODEL = "https://raw.githubusercontent.com/czbiohub/napari-bb-annotations/pranathi-tflite/data/output_tflite_graph.tflite"
