@@ -7,7 +7,7 @@ import pandas as pd
 
 
 class CentroidTracker():
-    def __init__(self, max_disappeared=30):
+    def __init__(self, max_disappeared=1):
         # initialize the next unique object ID along with two ordered
         # dictionaries used to keep track of mapping a given object
         # ID to its centroid and number of consecutive frames it has
@@ -57,7 +57,7 @@ class CentroidTracker():
             for i in range(0, number_of_objects):
                 self.register(input_centroids[i])
 
-        # otherwise, are are currently tracking objects so we need to
+        # otherwise, are currently tracking objects so we need to
         # try to match the input centroids to existing object
         # centroids
         else:

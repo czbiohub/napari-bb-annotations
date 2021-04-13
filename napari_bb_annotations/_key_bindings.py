@@ -149,6 +149,14 @@ def create_label_menu(shapes_layer, image_layer):
         current_properties = shapes_layer.current_properties
         current_properties[label_property] = np.asarray([selected_label])
         shapes_layer.current_properties = current_properties
+        box_labels = shapes_layer.properties[label_property].tolist()
+        cell_ids = shapes_layer.properties[cell_id_property].tolist()
+        unique_cell_labels = {}
+        for index, cell_id in enumerate(cell_ids):
+            if cell_id == current_cell_id:
+                box_labels[index] = new_label
+        shapes_layer.properties[label_property] = np.array(box_labels)
+        shapes_layer.text.refresh_text(shapes_layer.properties)
 
     label_menu.changed.connect(label_changed)
 
@@ -157,10 +165,17 @@ def create_label_menu(shapes_layer, image_layer):
 
 def update_summary_table(shapes_layer, image_layer):
     box_labels = shapes_layer.properties["box_label"].tolist()
+    total_sum = len(box_labels)
+    count_labels = []
+    percentage_labels = []
+    for label in BOX_ANNOTATIONS:
+        count_labels.append(box_labels.count(label))
+        percentage_labels.append((count_label * 100) / total_sum)
+    data = [count_labels, percentage_labels]
     split_dict = {
-        "data": [[box_labels.count(label)] for label in BOX_ANNOTATIONS],
+        "data": [data],
         "index": tuple(BOX_ANNOTATIONS),
-        "columns": ("c"),
+        "columns": ("c", "p"),
     }
     table_widget = Table(value=split_dict)
     label_property = "box_label"
@@ -192,28 +207,40 @@ def update_summary_table(shapes_layer, image_layer):
                         (cell_ids[index], box_labels[index])) for index in range(
                         len(cell_ids))]
                 unique_cell_id_labels = list(set(tuple_list))
-                index = BOX_ANNOTATIONS + [new_label]
+                index = sorted(BOX_ANNOTATIONS + [new_label])
                 unique_cell_labels = [i[1] for i in unique_cell_id_labels]
-                data = [[unique_cell_labels.count(label)] for label in index]
+                count_labels = []
+                percentage_labels = []
+                total_sum = len(unique_cell_labels)
+                for label in BOX_ANNOTATIONS:
+                    count_labels.append(box_labels.count(label))
+                    percentage_labels.append((count_label * 100) / total_sum)
+                data = [count_labels, percentage_labels]
                 split_dict = {
-                    "data": data,
+                    "data": [data],
                     "index": tuple(index),
-                    "columns": ("c"),
+                    "columns": ("c", "p"),
                 }
             else:
-                index = sorted(BOX_ANNOTATIONS)
                 tuple_list = [
                     tuple(
                         (cell_ids[index], box_labels[index])) for index in range(
                         len(cell_ids))]
                 unique_cell_id_labels = list(set(tuple_list))
-                index = BOX_ANNOTATIONS + [new_label]
                 unique_cell_labels = [i[1] for i in unique_cell_id_labels]
-                data = [[unique_cell_labels.count(label)] for label in index]
+                index = sorted(np.unique(shapes_layer.properties['box_label']).tolist())
+                index = sorted(index + BOX_ANNOTATIONS)
+                total_sum = len(unique_cell_labels)
+                count_labels = []
+                percentage_labels = []
+                for label in BOX_ANNOTATIONS:
+                    count_labels.append(box_labels.count(label))
+                    percentage_labels.append((count_label * 100) / total_sum)
+                data = [count_labels, percentage_labels]
                 split_dict = {
-                    "data": data,
+                    "data": [data],
                     "index": tuple(index),
-                    "columns": ("c"),
+                    "columns": ("c", "p"),
                 }
             table_widget.value = split_dict
     shapes_layer.events.current_properties.connect(
@@ -227,13 +254,21 @@ def update_summary_table(shapes_layer, image_layer):
                 (cell_ids[index], box_labels[index])) for index in range(
                 len(cell_ids))]
         unique_cell_id_labels = list(set(tuple_list))
-        index = sorted(BOX_ANNOTATIONS + [new_label])
         unique_cell_labels = [i[1] for i in unique_cell_id_labels]
-        data = [[unique_cell_labels.count(label)] for label in BOX_ANNOTATIONS]
+        index = sorted(np.unique(shapes_layer.properties['box_label']).tolist())
+        index = sorted(index + BOX_ANNOTATIONS)
+        total_sum = len(unique_cell_labels)
+
+        count_labels = []
+        percentage_labels = []
+        for label in BOX_ANNOTATIONS:
+            count_labels.append(box_labels.count(label))
+            percentage_labels.append((count_label * 100) / total_sum)
+        data = [count_labels, percentage_labels]
         split_dict = {
-            "data": data,
-            "index": tuple(BOX_ANNOTATIONS),
-            "columns": ("c"),
+            "data": [data],
+            "index": tuple(index),
+            "columns": ("c", "p"),
         }
         table_widget.value = split_dict
 
@@ -493,7 +528,9 @@ def run_tracking_on_images(viewer):
     df = pd.read_csv(os.path.join(dirname, "bb_labels.csv"), index_col=False)
     df = centroid_tracker.df_centroid_tracking_rectangles(
         df, MAX_DISAPPEARED_FRAMES, all_files)
-    viewer.layers['Shapes'].properties["unique_cell_id"] = df["unique_cell_id"].tolist()
+    shapes_layer = viewer.layers['Shapes']
+    shapes_layer.properties["unique_cell_id"] = np.array(df["unique_cell_id"].tolist())
+    shapes_layer.text.refresh_text(shapes_layer.properties)
 
 
 def update_layers(viewer):
