@@ -367,7 +367,7 @@ def run_inference_on_images(viewer):
     inference_metadata_path = os.path.join(
         dirname, "inference_metadata.pickle")
     already_inferenced = [False] * len(all_files)
-    if os.path.exists(inference_metadata_path):
+    if os.path.exists(inference_metadata_path) and not viewer.layers["Image"].metadata["loaded"]:
         inference_metadata = pickle_load(inference_metadata_path)
         already_inferenced = inference_metadata["tflite_inferenced"]
         if set(already_inferenced) == {True}:
@@ -583,7 +583,7 @@ def run_lumi_on_image(viewer):
 
     csv_path = os.path.join(dirname, "bb_labels.csv")
 
-    if not viewer.layers["Image"].metadata["lumi_inferenced"][index_of_image]:
+    if not viewer.layers["Image"].metadata["lumi_inferenced"][index_of_image] and not viewer.layers["Image"].metadata["loaded"]:
         # To not overwrite the existing csv, and lose the predictions per image
         # from last image
         if os.path.exists(csv_path):
