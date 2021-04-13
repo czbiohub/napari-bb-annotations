@@ -12,7 +12,7 @@ from PIL import Image, ImageDraw
 from napari_bb_annotations.constants_lumi import (
     BOX_ANNOTATIONS, LUMI_CSV_COLUMNS)
 from napari_bb_annotations.run_inference import (
-    detect_images, DEFAULT_CONFIDENCE, DEFAULT_INFERENCE_COUNT,
+    detect_images, DEFAULT_INFERENCE_COUNT,
     DEFAULT_FILTER_AREA)
 from napari.utils.notifications import (
     Notification,
@@ -395,9 +395,11 @@ def run_inference_on_images(viewer):
         saved_model_path = os.path.join(dirname, "output_tflite_graph.tflite")
         subprocess.check_call(
             "curl {} --output {}".format(model, saved_model_path), shell=True)
+        # TODO set lower intentionally for this release of the app
+        confidence = 0.1
         detect_images(
             saved_model_path, use_tpu, dirname, format_of_files,
-            labels_txt, DEFAULT_CONFIDENCE, dirname,
+            labels_txt, confidence, dirname,
             DEFAULT_INFERENCE_COUNT, False,
             DEFAULT_FILTER_AREA, True)
         df = pd.DataFrame(columns=LUMI_CSV_COLUMNS)
