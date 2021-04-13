@@ -13,10 +13,8 @@ from napari_bb_annotations.constants_lumi import (
     BOX_ANNOTATIONS, LUMI_CSV_COLUMNS)
 from napari_bb_annotations.run_inference import (
     detect_images)
-from napari._qt.dialogs.qt_notification import NapariQtNotification
 from napari.utils.notifications import (
     Notification,
-    NotificationSeverity,
     notification_manager,
     show_info,
 )
@@ -318,11 +316,12 @@ def save_bb_labels(viewer):
 
 def load_bb_labels(viewer):
     logger.info("Pressed load bounding box, labels button")
-    notif = Notification(
-        "Already ran threshold prediction, click load",
-        NotificationSeverity.INFO,
-        actions=[('click', lambda x: None)])
-    NapariQtNotification.show_notification(notif)
+    with notification_manager:
+        # save all of the events that get emitted
+        store: List[Notification] = []   # noqa
+        _append = lambda e: store.append(e)  # lambda needed on py3.7  # noqa
+        notification_manager.notification_ready.connect(_append)
+        show_info('Pressed load bounding boxes, labels button')
     logger.info("Pressed load bounding box, labels button")
     if viewer.layers["Image"].metadata["loaded"]:
         return
@@ -357,10 +356,12 @@ def load_bb_labels(viewer):
 
 def run_inference_on_images(viewer):
     logger.info("Pressed button for running prediction")
-    notif = Notification(
-        'Pressed button for running prediction, takes up to 1s per image',
-        NotificationSeverity.INFO,
-        actions=[('click', lambda x: None)])
+    with notification_manager:
+        # save all of the events that get emitted
+        store: List[Notification] = []   # noqa
+        _append = lambda e: store.append(e)  # lambda needed on py3.7  # noqa
+        notification_manager.notification_ready.connect(_append)
+        show_info('Pressed button for running prediction using tflite model')
     NapariQtNotification.show_notification(notif)
     all_files = viewer.layers["Image"].metadata["all_files"]
     filename = all_files[0]
@@ -372,11 +373,12 @@ def run_inference_on_images(viewer):
         inference_metadata = pickle_load(inference_metadata_path)
         already_inferenced = inference_metadata["tflite_inferenced"]
         if set(already_inferenced) == {True}:
-            notif = Notification(
-                'Already ran tflite prediction, click load',
-                NotificationSeverity.INFO,
-                actions=[('click', lambda x: None)])
-            NapariQtNotification.show_notification(notif)
+            with notification_manager:
+                # save all of the events that get emitted
+                store: List[Notification] = []   # noqa
+                _append = lambda e: store.append(e)  # lambda needed on py3.7  # noqa
+                notification_manager.notification_ready.connect(_append)
+                show_info('Already ran tflite prediction, click load')
             logger.info("Already ran tflite prediction")
     if set(already_inferenced) == {False}:
         box_annotations = viewer.layers["Image"].metadata["box_annotations"]
@@ -415,11 +417,12 @@ def run_inference_on_images(viewer):
 
 def run_segmentation_on_images(viewer):
     logger.info("Pressed button for running segmentation")
-    notif = Notification(
-        'Pressed button for running segmentation',
-        NotificationSeverity.INFO,
-        actions=[('click', lambda x: None)])
-    NapariQtNotification.show_notification(notif)
+    with notification_manager:
+        # save all of the events that get emitted
+        store: List[Notification] = []   # noqa
+        _append = lambda e: store.append(e)  # lambda needed on py3.7  # noqa
+        notification_manager.notification_ready.connect(_append)
+        show_info('Pressed button for running segmentation')
     # label image regions
     all_files = viewer.layers["Image"].metadata["all_files"]
     dirname = os.path.dirname(all_files[0])
@@ -565,6 +568,12 @@ def load_bb_labels_for_image(viewer):
 
 def run_lumi_on_image(viewer):
     logger.info("Pressed button to run luminoth prediction")
+    with notification_manager:
+        # save all of the events that get emitted
+        store: List[Notification] = []   # noqa
+        _append = lambda e: store.append(e)  # lambda needed on py3.7  # noqa
+        notification_manager.notification_ready.connect(_append)
+        show_info('Pressed button for running prediction using tensorflow model')
     image_layer = viewer.layers["Image"]
     metadata = image_layer.metadata
     all_files = metadata["all_files"]
