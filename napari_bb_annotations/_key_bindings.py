@@ -259,7 +259,6 @@ def update_summary_table(shapes_layer, image_layer):
 
     shapes_layer.events.current_properties.connect(update_table_on_label_change)
     shapes_layer.events.set_data.connect(update_table_on_coordinates_change)
-    shapes_layer.events.properties.connect(update_table_on_coordinates_change)
     return table_widget
 
 
@@ -345,9 +344,6 @@ def load_bb_labels(viewer):
     logger.info("Pressed load bounding box, labels button")
     if set(viewer.layers["Image"].metadata["loaded"]) == {True}:
         return
-    index_of_image = viewer.dims.current_step[0]
-    if viewer.layers["Image"].metadata["loaded"][index_of_image]:
-        return
     all_files = viewer.layers["Image"].metadata["all_files"]
     dirname = os.path.dirname(all_files[0])
     csv_path = os.path.join(dirname, "bb_labels.csv")
@@ -428,6 +424,7 @@ def run_inference_on_images(viewer):
         viewer.layers["Image"].metadata["tflite_inferenced"] = inferenced_list
         metadata = {"tflite_inferenced": inferenced_list}
         pickle_save(inference_metadata_path, metadata)
+        load_bb_labels(viewer)
 
 
 def run_segmentation_on_images(viewer):
@@ -485,12 +482,13 @@ def run_segmentation_on_images(viewer):
         metadata = {"threshold_inferenced": inferenced_list}
         pickle_save(inference_metadata_path, metadata)
         df.to_csv(os.path.join(dirname, "bb_labels.csv"), index=False)
+        load_bb_labels(viewer)
 
 
 def update_layers(viewer):
     logger.info("Updating layers")
     if viewer.layers["Image"].metadata["updated"]:
-        return
+        return viewer.layers["Image"].metadata["table_widget"]
     shapes_layer = viewer.layers['Shapes']
     image_layer = viewer.layers['Image']
     shapes_layer.mode = 'add_rectangle'
@@ -507,6 +505,7 @@ def update_layers(viewer):
     table_widget.max_height = 400
     viewer.layers["Image"].metadata["updated"] = True
     viewer.window.add_dock_widget(table_widget, area='right')
+    viewer.layers["Image"].metadata["table_widget"] = table_widget
     return table_widget
 
 
