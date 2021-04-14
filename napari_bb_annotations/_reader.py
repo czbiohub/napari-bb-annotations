@@ -127,7 +127,7 @@ def reader_function(path):
         "all_files": all_files,
         "box_annotations": BOX_ANNOTATIONS,
         "new_labels": [],
-        "loaded": False,
+        "loaded": [False] * num_files,
         "updated": False,
         "tflite_inferenced": [False] * num_files,
         "threshold_inferenced": [False] * num_files,

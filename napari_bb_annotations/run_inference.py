@@ -23,6 +23,9 @@ import numpy as np
 import pandas as pd
 from PIL import Image
 from PIL import ImageDraw
+from skimage.io import imread
+from skimage.color import gray2rgb
+from skimage.filters import threshold_otsu
 import napari_bb_annotations.detect as detect
 import napari_bb_annotations.utils as utils
 
@@ -33,6 +36,10 @@ DEFAULT_CONFIDENCE = 0.4
 DEFAULT_FILTER_AREA = 22680
 DEFAULT_INFERENCE_COUNT = 1
 DEFAULT_IMAGE_FORMAT = ".jpg"
+
+
+def scale_to_uint8(image):
+    return ((image - image.min()) / (image.max() - image.min()) * 255).astype(np.uint8)
 
 
 def detect_images(
@@ -71,8 +78,17 @@ def detect_images(
         print('Note: The first inference is slow because it includes',
               'loading the model into Edge TPU memory.')
     for input_image in input_images:
-        print(input_image)
-        image = Image.open(input_image)
+        numpy_image = imread(input_image)
+        if numpy_image.dtype == "uint16":
+            numpy_image = scale_to_uint8(numpy_image)
+            if len(numpy_image.shape) == 3:
+                if numpy_image.shape[2] == 1:
+                    numpy_image = gray2rgb(numpy_image)
+            elif len(numpy_image.shape) == 2:
+                numpy_image = gray2rgb(numpy_image)
+            image = Image.fromarray(numpy_image)
+        else:
+            image = Image.open(input_image)
         scale = detect.set_input(
             interpreter, image.size,
             lambda size: image.resize(size, Image.ANTIALIAS))
@@ -81,7 +97,7 @@ def detect_images(
             numpy_image = numpy_image[:, :, 0]
             thresholded_image = np.zeros(
                 (numpy_image.shape[0], numpy_image.shape[1]), dtype=np.uint8)
-            thresh_value = 128
+            thresh_value = threshold_otsu(numpy_image)
             thresholded_image[numpy_image < thresh_value] = 1
         for _ in range(count):
             start = time.perf_counter()
@@ -120,7 +136,6 @@ def detect_images(
                          'label': labels.get(obj.id, obj.id),
                          'prob': obj.score}, ignore_index=True)
                     filtered_objs.append(obj)
-        print(len(filtered_objs))
         if overlaid:
             image = image.convert('RGB')
             utils.draw_objects(ImageDraw.Draw(image), filtered_objs, labels)
@@ -128,7 +143,6 @@ def detect_images(
                 os.path.join(
                     output,
                     os.path.basename(input_image)))
-    df['unique_cell_id'].values[:] = 0
     df.to_csv(os.path.join(output, "bb_labels.csv"))
 
 
