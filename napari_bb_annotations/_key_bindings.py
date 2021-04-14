@@ -1,10 +1,11 @@
 import datetime
+import functools
+import json
 import logging
 import os
 import pickle
 from typing import List
 
-import luminoth.predict
 import numpy as np
 import pandas as pd
 from magicgui.widgets import ComboBox, Container, Table
@@ -15,6 +16,56 @@ from napari.utils.notifications import (
     notification_manager,
     show_info,
 )
+
+
+def check_bbox(bbox, width, height):
+    error = False
+    xmin, ymin, xmax, ymax = bbox[0], bbox[1], bbox[2], bbox[3]
+    if xmin > width:
+        xmin = width
+        error = True
+    if xmin < 0:
+        xmin = 0
+        error = True
+    if xmax > width:
+        xmax = width
+        error = True
+    if ymin > height:
+        ymin = height
+        error = True
+    if ymin < 0:
+        ymin = 0
+        error = True
+    if ymax > height:
+        ymax = height
+        error = True
+    return error, np.array([xmin, ymin, xmax, ymax])
+
+
+@functools.lru_cache()
+def get_predictor_network(checkpoint, max_detections, min_prob):
+    from luminoth.utils.predicting import PredictorNetwork
+    from luminoth.tools.checkpoint import get_checkpoint_config
+
+    # Resolve the config to use and initialize the model.
+    config = get_checkpoint_config(checkpoint)
+
+    # Filter bounding boxes according to `min_prob` and `max_detections`.
+    if config.model.type == 'fasterrcnn':
+        if config.model.network.with_rcnn:
+            config.model.rcnn.proposals.total_max_detections = max_detections
+        else:
+            config.model.rpn.proposals.post_nms_top_n = max_detections
+        config.model.rcnn.proposals.min_prob_threshold = min_prob
+    elif config.model.type == 'ssd':
+        config.model.proposals.total_max_detections = max_detections
+        config.model.proposals.min_prob_threshold = min_prob
+    else:
+        raise ValueError(
+            "Model type '{}' not supported".format(config.model.type)
+        )
+    network = PredictorNetwork(config)
+    return network
 
 
 def pickle_save(path, metadata_dct):
@@ -151,12 +202,19 @@ def create_label_menu(shapes_layer, image_layer):
 
 def update_summary_table(shapes_layer, image_layer):
     box_labels = shapes_layer.properties["box_label"].tolist()
+    total_sum = len(box_labels)
+    index = BOX_ANNOTATIONS
+    data = []
+    for label in index:
+        count_label = box_labels.count(label)
+        data.append([count_label, round((count_label * 100) / total_sum, 2)])
     split_dict = {
-        "data": [[box_labels.count(label)] for label in BOX_ANNOTATIONS],
-        "index": tuple(BOX_ANNOTATIONS),
-        "columns": ("c"),
+        "data": data,
+        "index": tuple(index),
+        "columns": ("c", "p"),
     }
     table_widget = Table(value=split_dict)
+    table_widget.tooltip = "Edit the label for selected bounding box, Click close button after completing"
     label_property = "box_label"
     label_menu = ComboBox(label='text label', choices=BOX_ANNOTATIONS)
 
@@ -172,40 +230,50 @@ def update_summary_table(shapes_layer, image_layer):
                 new_labels = image_layer.metadata["new_labels"]
                 new_labels.append(new_label)
                 image_layer.metadata["new_labels"] = new_labels
-                index = sorted(BOX_ANNOTATIONS + [new_label])
-                data = [[box_labels.count(label)] for label in index]
+                data = []
+                total_sum = len(box_labels)
+                index = sorted([new_label] + BOX_ANNOTATIONS)
+                for label in index:
+                    count_label = box_labels.count(label)
+                    data.append([count_label, round((count_label * 100) / total_sum, 2)])
                 split_dict = {
                     "data": data,
                     "index": tuple(index),
-                    "columns": ("c"),
+                    "columns": ("c", "p"),
                 }
             else:
-                unique_labels = np.unique(
-                    shapes_layer.properties['box_label']).tolist()
-                data = [[box_labels.count(label)] for label in unique_labels]
+                index = sorted(np.unique(shapes_layer.properties['box_label']).tolist())
+                index = sorted(list(set(index + BOX_ANNOTATIONS)))
+                total_sum = len(box_labels)
+                data = []
+                for label in index:
+                    count_label = box_labels.count(label)
+                    data.append([count_label, round((count_label * 100) / total_sum, 2)])
                 split_dict = {
                     "data": data,
-                    "index": tuple(unique_labels),
-                    "columns": ("c"),
+                    "index": tuple(index),
+                    "columns": ("c", "p"),
                 }
             table_widget.value = split_dict
-    shapes_layer.events.current_properties.connect(
-        update_table_on_label_change)
 
     def update_table_on_coordinates_change(event):
-        unique_labels = np.unique(
-            shapes_layer.properties['box_label']).tolist()
-        box_labels = shapes_layer.properties["box_label"].tolist()
-        data = [[box_labels.count(label)] for label in unique_labels]
+        box_labels = shapes_layer.properties[label_property].tolist()
+        index = sorted(np.unique(shapes_layer.properties['box_label']).tolist())
+        index = sorted(list(set(index + BOX_ANNOTATIONS)))
+        total_sum = len(box_labels)
+        data = []
+        for label in index:
+            count_label = box_labels.count(label)
+            data.append([count_label, round((count_label * 100) / total_sum, 2)])
         split_dict = {
             "data": data,
-            "index": tuple(unique_labels),
-            "columns": ("c"),
+            "index": tuple(index),
+            "columns": ("c", "p"),
         }
         table_widget.value = split_dict
 
+    shapes_layer.events.current_properties.connect(update_table_on_label_change)
     shapes_layer.events.set_data.connect(update_table_on_coordinates_change)
-
     return table_widget
 
 
@@ -246,7 +314,7 @@ def save_bb_labels(viewer):
             z_index = np.unique((bbox[:, 0])).tolist()
             assert len(z_index) == 1
             if z_index[0] == stack_index:
-                bbox = check_bbox(get_bbox_obj_detection(bbox), width, height)
+                _, bbox = check_bbox(get_bbox_obj_detection(bbox), width, height)
                 label = labels[index]
                 df = df.append(
                     {'image_id': file_path,
@@ -254,14 +322,15 @@ def save_bb_labels(viewer):
                      'ymin': int(bbox[1]),
                      'xmax': int(bbox[2]),
                      'ymax': int(bbox[3]),
-                     'label': label,
+                     'label': label
                      }, ignore_index=True)
                 labels_for_image.append(label)
                 bboxes_converted.append(bbox)
         if len(bboxes_converted) != 0:
             draw_objects(
                 ImageDraw.Draw(image_at_index),
-                bboxes_converted, labels_for_image)
+                bboxes_converted,
+                labels_for_image)
             # save images
             basename = os.path.basename(file_path)
             overlaid_save_name = os.path.join(
@@ -269,14 +338,21 @@ def save_bb_labels(viewer):
                 "pred_{}".format(basename)
             )
             image_at_index.save(overlaid_save_name)
+
+    data = viewer.layers["Image"].metadata["table_widget"].value
+    json_path = os.path.join(
+        os.path.dirname(save_overlay_path), "summary_table.json")
+    with open(json_path, 'w') as fp:
+        json.dump(data, fp)
+    logger.info("csv path is {}".format(csv_path))
+    df.to_csv(csv_path)
     with notification_manager:
         # save all of the events that get emitted
         store: List[Notification] = []   # noqa
         _append = lambda e: store.append(e)  # lambda needed on py3.7  # noqa
         notification_manager.notification_ready.connect(_append)
-        show_info("csv path and overlaid images path is {}".format(csv_path, save_overlay_path))
-    logger.info("csv path is {}".format(csv_path))
-    df.to_csv(csv_path)
+        show_info("csv path and overlaid images path is {}".format(
+            csv_path, save_overlay_path))
 
 
 def load_bb_labels(viewer):
@@ -347,42 +423,45 @@ def run_inference_on_images(viewer):
 
                 show_info('Already ran prediction, click load')
             logger.info("Already ran prediction")
-    if set(already_inferenced) == {False}:
-        model = image_layer.metadata["model"]
-        csv_path = os.path.join(dirname, "bb_labels.csv")
-        path_or_dir = dirname
-        config_files = None
-        checkpoint = model
-        override_params = None
-        output_path = csv_path
-        save_media_to = None
-        min_prob = 0.5
-        max_prob = 1.5
-        max_detections = 100
-        only_class = None
-        ignore_class = None
-        debug = False
-        xlsx_spacing = 2
-        classes_json = None
-        pixel_distance = 0
-        new_labels = None
-        luminoth.predict.predict_function(
-            path_or_dir, config_files, checkpoint, override_params,
-            output_path, save_media_to, min_prob, max_prob,
-            max_detections, only_class,
-            ignore_class, debug, xlsx_spacing,
-            classes_json, pixel_distance, new_labels)
-        inferenced_list = [True] * len(all_files)
-        viewer.layers["Image"].metadata["inferenced"] = inferenced_list
-        metadata = {"inferenced": inferenced_list}
-        pickle_save(inference_metadata_path, metadata)
-        logger.info("subprocess call completed ")
+            return
+    df = pd.DataFrame(columns=LUMI_CSV_COLUMNS)
+    import luminoth.predict
+    network = get_predictor_network(model, max_detections=100, min_prob=0.5)
+    for file in all_files:
+        objects = luminoth.predict.predict_image(
+            network, filename,
+            only_classes=None,
+            ignore_classes=None,
+            save_path=None,
+            min_prob=0.5,
+            max_prob=1.0,
+            pixel_distance=0,
+            new_labels=None
+        )
+        for obj in objects:
+            df = df.append({'image_id': filename,
+                            'xmin': obj['bbox'][0],
+                            'xmax': obj['bbox'][2],
+                            'ymin': obj['bbox'][1],
+                            'ymax': obj['bbox'][3],
+                            'label': obj['label'],
+                            'prob': obj["prob"]},
+                           ignore_index=True)
+
+    df = df.drop_duplicates()
+    df.to_csv(csv_path, index=False)
+    inferenced_list = [True] * len(all_files)
+    viewer.layers["Image"].metadata["tflite_inferenced"] = inferenced_list
+    metadata = {"tflite_inferenced": inferenced_list}
+    pickle_save(inference_metadata_path, metadata)
+    logger.info("subprocess call completed ")
+    load_bb_labels(viewer)
 
 
 def update_layers(viewer):
     logger.info("Updating layers")
     if viewer.layers["Image"].metadata["updated"]:
-        return
+        return viewer.layers["Image"].metadata["table_widget"]
     shapes_layer = viewer.layers['Shapes']
     image_layer = viewer.layers['Image']
     shapes_layer.mode = 'add_rectangle'
@@ -399,6 +478,8 @@ def update_layers(viewer):
     table_widget.max_height = 400
     viewer.layers["Image"].metadata["updated"] = True
     viewer.window.add_dock_widget(table_widget, area='right')
+    viewer.layers["Image"].metadata["table_widget"] = table_widget
+    return table_widget
 
 
 def get_properties_table(current_properties):
@@ -420,6 +501,7 @@ def edit_bb_labels(viewer):
         notification_manager.notification_ready.connect(_append)
         show_info('Pressed edit bounding box label button')
     shapes_layer = viewer.layers["Shapes"]
+    shapes_layer.mode = 'select'
 
     current_properties = shapes_layer.current_properties['box_label'].tolist()
     table_widget = get_properties_table(current_properties)
@@ -431,48 +513,74 @@ def edit_bb_labels(viewer):
         new_label = item.data(table_widget._widget._DATA_ROLE)
         new_label = new_label.capitalize()
         current_properties = shapes_layer.current_properties
-        current_properties['box_label'] = np.asarray([new_label])
+        current_properties['box_label'] = np.asarray([new_label], dtype='<U32')
         shapes_layer.current_properties = current_properties
         table_widget.clear()
+        table_widget.visible = False
+        # set the shapes layer mode back to rectangle
+        shapes_layer.mode = 'add_rectangle'
 
     table_widget.native.itemChanged.connect(on_item_changed)
 
     viewer.window.add_dock_widget(table_widget, area='left')
 
 
-def load_bb_labels_for_image(viewer):
+def load_bb_labels_for_image(viewer, csv_path):
     logger.info("Loading inference results for image")
     all_files = viewer.layers["Image"].metadata["all_files"]
     index_of_image = viewer.dims.current_step[0]
-    filename = all_files[index_of_image]
-    dirname = os.path.dirname(all_files[0])
-    df = pd.read_csv(os.path.join(dirname, "bb_labels.csv"), index_col=False)
-    # Filter out the df for all the bounding boxes in one image
-    tmp_df = df[df.image_id == filename]
-    shape = viewer.layers["Shapes"]
-    bboxes = shape.data
-    labels = shape.properties["box_label"].tolist()
-    for index, row in tmp_df.iterrows():
-        x1 = row.xmin
-        x2 = row.xmax
-        y1 = row.ymin
-        y2 = row.ymax
-        label = row.label
-        image_id = row.image_id
-        z = all_files.index(image_id)
-        bbox_rect = np.array(
-            [[z, y1, x1], [z, y2, x1], [z, y2, x2], [z, y1, x2]]
-        )
-        bboxes.append(bbox_rect)
-        labels.append(label)
-    shapes_layer = viewer.layers["Shapes"]
-    shapes_layer.data = bboxes
-    shapes_layer.properties["box_label"] = np.array(labels)
-    shapes_layer.text.refresh_text(shapes_layer.properties)
+    if not viewer.layers["Image"].metadata["loaded"][index_of_image]:
+        filename = all_files[index_of_image]
+        dirname = os.path.dirname(all_files[0])
+        df = pd.read_csv(csv_path, index_col=False)
+        df = df.drop_duplicates()
+        # Filter out the df for all the bounding boxes in one image
+        tmp_df = df[df.image_id == filename]
+        shapes_layer = viewer.layers["Shapes"]
+        bboxes = shapes_layer.data
+        labels = shapes_layer.properties["box_label"].tolist()
+        for index, row in tmp_df.iterrows():
+            x1 = row.xmin
+            x2 = row.xmax
+            y1 = row.ymin
+            y2 = row.ymax
+            label = row.label
+            image_id = row.image_id
+            z = all_files.index(image_id)
+            bbox_rect = np.array(
+                [[z, y1, x1], [z, y2, x1], [z, y2, x2], [z, y1, x2]]
+            )
+            bboxes.append(bbox_rect)
+            labels.append(label)
+        shapes_layer.data = bboxes
+        shapes_layer.properties["box_label"] = np.array(labels, dtype='<U32')
+        shapes_layer.text.refresh_text(shapes_layer.properties)
+        viewer.layers["Image"].metadata["loaded"][index_of_image] = True
+    table_widget = update_layers(viewer)
+    box_labels = shapes_layer.properties['box_label'].tolist()
+    index = sorted(np.unique(shapes_layer.properties['box_label']).tolist())
+    index = sorted(list(set(index + BOX_ANNOTATIONS)))
+    total_sum = len(box_labels)
+    data = []
+    for label in index:
+        count_label = box_labels.count(label)
+        data.append([count_label, round((count_label * 100) / total_sum, 2)])
+    split_dict = {
+        "data": data,
+        "index": tuple(index),
+        "columns": ("c", "p"),
+    }
+    table_widget.value = split_dict
 
 
 def run_inference_on_image(viewer):
-    logger.info("Pressed button to run inference/prediction")
+    logger.info("Pressed button to run luminoth prediction")
+    with notification_manager:
+        # save all of the events that get emitted
+        store: List[Notification] = []   # noqa
+        _append = lambda e: store.append(e)  # lambda needed on py3.7  # noqa
+        notification_manager.notification_ready.connect(_append)
+        show_info('Pressed button for running prediction using tensorflow model')
     image_layer = viewer.layers["Image"]
     metadata = image_layer.metadata
     all_files = metadata["all_files"]
@@ -480,9 +588,18 @@ def run_inference_on_image(viewer):
     filename = all_files[index_of_image]
     dirname = os.path.dirname(filename)
     model = image_layer.metadata["model"]
+    inference_metadata_path = os.path.join(
+        dirname, "inference_metadata.pickle")
 
-    csv_path = os.path.join(dirname, "bb_labels.csv")
-
+    csv_path = os.path.join(dirname, "lumi_bb_labels.csv")
+    inferenced_list = [False] * len(all_files)
+    if os.path.exists(inference_metadata_path):
+        inference_metadata = pickle_load(inference_metadata_path)
+        if "inferenced" in inference_metadata:
+            inferenced_list = inference_metadata["inferenced"]
+            if inferenced_list[index_of_image]:
+                load_bb_labels_for_image(viewer, csv_path)
+                return
     if not viewer.layers["Image"].metadata["inferenced"][index_of_image]:
         # To not overwrite the existing csv, and lose the predictions per image
         # from last image
@@ -490,42 +607,38 @@ def run_inference_on_image(viewer):
             df = pd.read_csv(csv_path, index_col=False)
         else:
             df = pd.DataFrame(columns=LUMI_CSV_COLUMNS)
-        csv_path_per_image = os.path.join(
-            dirname, "bb_labels_{}.csv".format(os.path.basename(filename)))
-        path_or_dir = filename
-        config_files = None
-        checkpoint = model
-        override_params = None
-        output_path = csv_path_per_image
-        save_media_to = None
-        min_prob = 0.5
-        max_prob = 1.5
-        max_detections = 100
-        only_class = None
-        ignore_class = None
-        debug = False
-        xlsx_spacing = 2
-        classes_json = None
-        pixel_distance = 0
-        new_labels = None
-        luminoth.predict.predict_function(
-            path_or_dir, config_files, checkpoint, override_params,
-            output_path, save_media_to, min_prob, max_prob,
-            max_detections, only_class,
-            ignore_class, debug, xlsx_spacing,
-            classes_json, pixel_distance, new_labels)
-        if os.path.exists(csv_path_per_image):
-            frames = [df, pd.read_csv(csv_path_per_image, index_col=False)]
-            os.remove(csv_path_per_image)
-            result_df = pd.concat(frames, ignore_index=True)
-            result_df.to_csv(csv_path, index=False)
-            logger.info("lumi prediction per image subprocess call completed ")
-            viewer.layers["Image"].metadata["inferenced"][index_of_image] = True
-            load_bb_labels_for_image(viewer)
-        else:
-            logger.error("Prediction unsuccesful")
-            e.args += ('Prediction unsuccesful')
-            notif = ErrorNotification(AssertionError)
-            dialog = NapariQtNotification.from_notification(notif)
+
+        import luminoth.predict
+
+        network = get_predictor_network(model, max_detections=100, min_prob=0.5)
+
+        objects = luminoth.predict.predict_image(
+            network, filename,
+            only_classes=None,
+            ignore_classes=None,
+            save_path=None,
+            min_prob=0.5,
+            max_prob=1.0,
+            pixel_distance=0,
+            new_labels=None
+        )
+        for obj in objects:
+            df = df.append({'image_id': filename,
+                            'xmin': obj['bbox'][0],
+                            'xmax': obj['bbox'][2],
+                            'ymin': obj['bbox'][1],
+                            'ymax': obj['bbox'][3],
+                            'label': obj['label'],
+                            'prob': obj["prob"]},
+                           ignore_index=True)
+
+        df = df.drop_duplicates()
+        df.to_csv(csv_path, index=False)
+        logger.info("lumi prediction per image subprocess call completed ")
+        viewer.layers["Image"].metadata["inferenced"][index_of_image] = True
+        inferenced_list[index_of_image] = True
+        metadata = {"inferenced": inferenced_list}
+        pickle_save(inference_metadata_path, metadata)
+        load_bb_labels_for_image(viewer, csv_path)
     else:
-        load_bb_labels_for_image(viewer)
+        load_bb_labels_for_image(viewer, csv_path)

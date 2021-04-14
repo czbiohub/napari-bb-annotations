@@ -6,6 +6,7 @@ channels:
   - defaults
 dependencies:
   - conda-forge::python=3.7.3
+  - scipy==1.2.0
   - imageio
   - imageio-ffmpeg
   - importlib-metadata>=1.5.0
@@ -22,6 +23,7 @@ dependencies:
   - PyYAML>=5.1
   - qtconsole>=4.5.1
   - qtpy>=1.7.0
+  - pip=20.0.2
   - scipy>=1.2.0
   - scikit-image==0.17.2
   - toolz>=0.10.0
@@ -41,5 +43,5 @@ dependencies:
   - typing_extensions
   - pip:
     - tensorflow==1.13.2
-    - git+git://github.com/czbiohub/luminoth-uv-imaging.git@6a5115c395c915a4f8390732182e5c32d0c30794
-    - git+git://github.com/napari/napari.git@866848d35d039c098b45e8d6f12eae0924633347 # master - Tested for only until April 4th commit of master
+    - git+git://github.com/czbiohub/luminoth-uv-imaging.git@14f00ab37c9094474f90bc0fcbe36bdc2dfa2936
+    - git+git://github.com/napari/napari.git@c799d11049830ff0263df96cc1425770ae7f3def # master - Tested for only until April 13th commit of master
