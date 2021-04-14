@@ -331,6 +331,10 @@ def save_bb_labels(viewer):
         show_info("csv path and overlaid images path is {}".format(csv_path, save_overlay_path))
     logger.info("csv path is {}".format(csv_path))
     df.to_csv(csv_path)
+    data = viewer.layers["Image"].metadata["table_widget"].value
+    df = pd.DataFrame.from_dict(data)
+    df.to_csv(os.path.join(
+        os.path.dirname(save_overlay_path), "summary_table.csv"))
 
 
 def load_bb_labels(viewer):
