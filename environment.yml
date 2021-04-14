@@ -43,5 +43,6 @@ dependencies:
   - typing_extensions
   - pip:
     - tensorflow==1.13.2
+    - https://dl.google.com/coral/python/tflite_runtime-2.1.0.post1-cp37-cp37m-macosx_10_14_x86_64.whl
     - git+git://github.com/czbiohub/luminoth-uv-imaging.git@14f00ab37c9094474f90bc0fcbe36bdc2dfa2936
     - git+git://github.com/napari/napari.git@c799d11049830ff0263df96cc1425770ae7f3def # master - Tested for only until April 13th commit of master
