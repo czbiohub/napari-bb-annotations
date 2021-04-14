@@ -374,7 +374,21 @@ def load_bb_labels(viewer):
         shapes_layer.data = bboxes
         shapes_layer.properties["box_label"] = np.array(labels, dtype='<U32')
         shapes_layer.text.refresh_text(shapes_layer.properties)
-    update_layers(viewer)
+    table_widget = update_layers(viewer)
+    box_labels = shapes_layer.properties['box_label'].tolist()
+    index = sorted(np.unique(shapes_layer.properties['box_label']).tolist())
+    index = sorted(list(set(index + BOX_ANNOTATIONS)))
+    total_sum = len(box_labels)
+    data = []
+    for label in index:
+        count_label = box_labels.count(label)
+        data.append([count_label, round((count_label * 100) / total_sum, 2)])
+    split_dict = {
+        "data": data,
+        "index": tuple(index),
+        "columns": ("c", "p"),
+    }
+    table_widget.value = split_dict
 
 
 def run_inference_on_images(viewer):
@@ -415,8 +429,9 @@ def run_inference_on_images(viewer):
 
         format_of_files = os.path.splitext(filename)[1]
         saved_model_path = os.path.join(dirname, "output_tflite_graph.tflite")
-        subprocess.check_call(
-            "curl {} --output {}".format(model, saved_model_path), shell=True)
+        if not os.path.exists(saved_model_path):
+            subprocess.check_call(
+                "curl {} --output {}".format(model, saved_model_path), shell=True)
         # TODO set lower intentionally for this release of the app
         confidence = 0.1
         detect_images(
@@ -556,14 +571,14 @@ def edit_bb_labels(viewer):
     viewer.window.add_dock_widget(table_widget, area='left')
 
 
-def load_bb_labels_for_image(viewer):
+def load_bb_labels_for_image(viewer, csv_path):
     logger.info("Loading inference results for image")
     all_files = viewer.layers["Image"].metadata["all_files"]
     index_of_image = viewer.dims.current_step[0]
     if not viewer.layers["Image"].metadata["loaded"][index_of_image]:
         filename = all_files[index_of_image]
         dirname = os.path.dirname(all_files[0])
-        df = pd.read_csv(os.path.join(dirname, "bb_labels.csv"), index_col=False)
+        df = pd.read_csv(csv_path, index_col=False)
         df = df.drop_duplicates()
         # Filter out the df for all the bounding boxes in one image
         tmp_df = df[df.image_id == filename]
@@ -622,14 +637,14 @@ def run_lumi_on_image(viewer):
     inference_metadata_path = os.path.join(
         dirname, "inference_metadata.pickle")
 
-    csv_path = os.path.join(dirname, "bb_labels.csv")
+    csv_path = os.path.join(dirname, "lumi_bb_labels.csv")
     inferenced_list = [False] * len(all_files)
     if os.path.exists(inference_metadata_path):
         inference_metadata = pickle_load(inference_metadata_path)
         if "lumi_inferenced" in inference_metadata:
             inferenced_list = inference_metadata["lumi_inferenced"]
             if inferenced_list[index_of_image]:
-                load_bb_labels_for_image(viewer)
+                load_bb_labels_for_image(viewer, csv_path)
                 return
     if not viewer.layers["Image"].metadata["lumi_inferenced"][index_of_image]:
         # To not overwrite the existing csv, and lose the predictions per image
@@ -670,6 +685,6 @@ def run_lumi_on_image(viewer):
         inferenced_list[index_of_image] = True
         metadata = {"lumi_inferenced": inferenced_list}
         pickle_save(inference_metadata_path, metadata)
-        load_bb_labels_for_image(viewer)
+        load_bb_labels_for_image(viewer, csv_path)
     else:
-        load_bb_labels_for_image(viewer)
+        load_bb_labels_for_image(viewer, csv_path)
