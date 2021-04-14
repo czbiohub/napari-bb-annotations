@@ -27,13 +27,13 @@ def connect_to_viewer(viewer):
     run_segmentation_btn.clicked.connect(lambda: run_segmentation_on_images(viewer))
     run_segmentation_btn.setToolTip("Overwrites other predictions, Runs otsu thresholding and converting to binary, and finds bbs")
 
-    run_lumi_btn = QPushButton("Tensorflow Predict on CURRENT image")
+    run_lumi_btn = QPushButton("Luminoth Predict on CURRENT image")
     run_lumi_btn.clicked.connect(lambda: run_lumi_on_image(viewer))
     run_lumi_btn.setToolTip("Overwrites other predictions, Per 1 image with 20 bbs takes 20 seconds depending on CPU/GPU")
 
     load_gui_btn = QPushButton("Load annotations")
     load_gui_btn.clicked.connect(lambda: load_bb_labels(viewer))
-    load_gui_btn.setToolTip("Loads annotations from an existing file named bb_labels.csv created last time prediction was ran")
+    load_gui_btn.setToolTip("Loads annotations from an existing file named bb_labels.csv created last time prediction was ran, not luminoth")
 
     save_gui_btn = QPushButton("Save annotations")
     save_gui_btn.clicked.connect(lambda: save_bb_labels(viewer))

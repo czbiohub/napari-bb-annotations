@@ -1,4 +1,5 @@
 import datetime
+import json
 import logging
 import functools
 import os
@@ -332,9 +333,10 @@ def save_bb_labels(viewer):
     logger.info("csv path is {}".format(csv_path))
     df.to_csv(csv_path)
     data = viewer.layers["Image"].metadata["table_widget"].value
-    df = pd.DataFrame.from_dict(data)
-    df.to_csv(os.path.join(
-        os.path.dirname(save_overlay_path), "summary_table.csv"))
+    json_path = os.path.join(
+        os.path.dirname(save_overlay_path), "summary_table.json")
+    with open(json_path, 'w') as fp:
+        json.dump(data, fp)
 
 
 def load_bb_labels(viewer):
@@ -415,8 +417,8 @@ def run_inference_on_images(viewer):
                 store: List[Notification] = []   # noqa
                 _append = lambda e: store.append(e)  # lambda needed on py3.7  # noqa
                 notification_manager.notification_ready.connect(_append)
-                show_info('Already ran tflite prediction, click load')
-            logger.info("Already ran tflite prediction")
+                show_info('Already ran tflite prediction, loading')
+                load_bb_labels(viewer)
     if set(already_inferenced) == {False}:
         box_annotations = viewer.layers["Image"].metadata["box_annotations"]
         model = viewer.layers["Image"].metadata["tflite_model"]
