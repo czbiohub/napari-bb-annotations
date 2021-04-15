@@ -91,27 +91,6 @@ logging.basicConfig(
 )
 
 
-def check_bbox(bbox, width, height):
-    xmin, ymin, xmax, ymax = bbox[0], bbox[1], bbox[2], bbox[3]
-    if xmin > width:
-        xmin = width
-    if xmin < 0:
-        xmin = 0
-
-    if xmax > width:
-        xmax = width
-
-    if ymin > height:
-        ymin = height
-
-    if ymin < 0:
-        ymin = 0
-
-    if ymax > height:
-        ymax = height
-    return np.array([xmin, ymin, xmax, ymax])
-
-
 def draw_objects(draw, bboxes, labels):
     """Draws the bounding box and label for each object."""
     for index, bbox in enumerate(bboxes):
