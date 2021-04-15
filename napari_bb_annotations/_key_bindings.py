@@ -467,8 +467,8 @@ def run_inference_on_images(viewer):
     csv_path = os.path.join(dirname, "bb_labels.csv")
     df.to_csv(csv_path, index=False)
     inferenced_list = [True] * len(all_files)
-    viewer.layers["Image"].metadata["tflite_inferenced"] = inferenced_list
-    metadata = {"tflite_inferenced": inferenced_list}
+    viewer.layers["Image"].metadata["inferenced"] = inferenced_list
+    metadata = {"inferenced": inferenced_list}
     pickle_save(inference_metadata_path, metadata)
     logger.info("subprocess call completed ")
     load_bb_labels(viewer)
@@ -607,7 +607,7 @@ def run_inference_on_image(viewer):
     inference_metadata_path = os.path.join(
         dirname, "inference_metadata.pickle")
 
-    csv_path = os.path.join(dirname, "lumi_bb_labels.csv")
+    csv_path = os.path.join(dirname, "bb_labels.csv")
     inferenced_list = [False] * len(all_files)
     if os.path.exists(inference_metadata_path):
         inference_metadata = pickle_load(inference_metadata_path)
