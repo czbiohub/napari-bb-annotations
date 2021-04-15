@@ -34,6 +34,30 @@ from setuptools import setup, find_packages
 
 import napari_bb_annotations
 
+requirements = ["appdirs >= 1.4.4",
+                "imageio-ffmpeg",
+                "imageio>=2.5.0"
+                "importlib-metadata>=1.5.0",
+                "ipykernel>=5.1.1",
+                "IPython>=7.7.0",
+                "magicgui==0.2.8",
+                "napari-plugin-engine>=0.1.5",
+                "napari-svg>=0.1.3",
+                "natsort",
+                "numpy>=1.10",
+                "pandas",
+                "Pillow!=7.1.0,!=7.1.1,==7.2.0",  # not a direct dependency, but 7.1.0 and 7.1.1 broke imageio
+                "psutil>=5.0",
+                "PyOpenGL>=3.1.0",
+                "pyside2>=5.12.3, <5.15",
+                "PyYAML>=5.1",
+                "qtconsole>=4.5.1",
+                "qtpy>=1.7.0",
+                "scipy>=1.2.0",
+                "tensorflow==1.13.2",
+                "toolz>=0.10.0",
+                "vispy>=0.6.4",
+                "wrapt>=1.11.1"]
 
 if len(sys.argv) < 3 or sys.argv[1] != "py2app" or "--alias" not in sys.argv:
     sys.stderr.write("Usage: python {} py2app --alias ...\n".format(sys.argv[0]))
@@ -60,6 +84,7 @@ setup(
     app=APP,
     options={"py2app": OPTIONS},
     setup_requires=["py2app==0.21"],
+    install_requires=requirements,
     version="0.0.1",
     description="Bounding box annotations",
     packages=find_packages(exclude=["tests.*", "tests", "data"]),
