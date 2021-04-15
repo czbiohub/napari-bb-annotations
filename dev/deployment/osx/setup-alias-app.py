@@ -51,7 +51,7 @@ OPTIONS = {
     "iconfile": icon_file,
     "extra_scripts": [os.path.join(REPO, "mac_execfile.py")],
     "alias": True,
-    "includes": "luminoth"
+    "includes": ["luminoth", "tensorflow==1.13.2", "napari"]
 }
 
 print(OPTIONS, REPO, APP)
