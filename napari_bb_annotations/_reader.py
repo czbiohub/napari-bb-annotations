@@ -14,8 +14,7 @@ import os
 
 from natsort import natsorted
 import numpy as np
-from skimage.io import imread
-
+from PIL import Image
 from napari_plugin_engine import napari_hook_implementation
 from napari_bb_annotations.constants_lumi import (
     BOX_ANNOTATIONS, MODEL, EDGETPU, IMAGE_FORMATS)
@@ -82,7 +81,7 @@ def reader_function(path):
             glob.glob(os.path.join(path, "*" + format_of_files))))
 
     # stack arrays into single array
-    shape = imread(all_files[0]).shape
+    shape = np.asarray(Image.open(all_files[0]).convert('RGB'), dtype=np.uint8).shape
     total_files = len(all_files)
     if len(shape) == 3:
         stack = np.zeros(
@@ -90,7 +89,7 @@ def reader_function(path):
     else:
         stack = np.zeros((total_files, shape[0], shape[1]), dtype=np.uint8)
     for i in range(total_files):
-        stack[i] = imread(all_files[i])
+        stack[i] = np.asarray(Image.open(all_files[i]).convert('RGB'), dtype=np.uint8)
 
     layer_type = "image"  # optional, default is "image"
     num_files = len(all_files)

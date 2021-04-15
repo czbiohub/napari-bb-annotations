@@ -362,18 +362,19 @@ def load_bb_labels(viewer):
         store: List[Notification] = []   # noqa
         _append = lambda e: store.append(e)  # lambda needed on py3.7  # noqa
         notification_manager.notification_ready.connect(_append)
-
-        show_info('Pressed load bounding box, labels button')
-    if viewer.layers["Image"].metadata["loaded"]:
+        show_info('Pressed load bounding boxes, labels button')
+    logger.info("Pressed load bounding box, labels button")
+    if set(viewer.layers["Image"].metadata["loaded"]) == {True}:
         return
     all_files = viewer.layers["Image"].metadata["all_files"]
     dirname = os.path.dirname(all_files[0])
     csv_path = os.path.join(dirname, "bb_labels.csv")
     if os.path.exists(csv_path):
         df = pd.read_csv(csv_path)
-        shape = viewer.layers["Shapes"]
-        bboxes = shape.data
-        labels = shape.properties["box_label"].tolist()
+        df = df.drop_duplicates()
+        shapes_layer = viewer.layers["Shapes"]
+        bboxes = shapes_layer.data
+        labels = shapes_layer.properties["box_label"].tolist()
         for index, row in df.iterrows():
             x1 = row.xmin
             x2 = row.xmax
@@ -387,12 +388,25 @@ def load_bb_labels(viewer):
             )
             bboxes.append(bbox_rect)
             labels.append(label)
-        shapes_layer = viewer.layers["Shapes"]
+        viewer.layers["Image"].metadata["loaded"] = [True] * len(all_files)
         shapes_layer.data = bboxes
-        viewer.layers["Image"].metadata["loaded"] = True
-        shapes_layer.properties["box_label"] = np.array(labels)
+        shapes_layer.properties["box_label"] = np.array(labels, dtype='<U32')
         shapes_layer.text.refresh_text(shapes_layer.properties)
-    update_layers(viewer)
+    table_widget = update_layers(viewer)
+    box_labels = shapes_layer.properties['box_label'].tolist()
+    index = sorted(np.unique(shapes_layer.properties['box_label']).tolist())
+    index = sorted(list(set(index + BOX_ANNOTATIONS)))
+    total_sum = len(box_labels)
+    data = []
+    for label in index:
+        count_label = box_labels.count(label)
+        data.append([count_label, round((count_label * 100) / total_sum, 2)])
+    split_dict = {
+        "data": data,
+        "index": tuple(index),
+        "columns": ("c", "p"),
+    }
+    table_widget.value = split_dict
 
 
 def run_inference_on_images(viewer):
@@ -426,8 +440,9 @@ def run_inference_on_images(viewer):
             return
     df = pd.DataFrame(columns=LUMI_CSV_COLUMNS)
     import luminoth.predict
+    model = image_layer.metadata["model"]
     network = get_predictor_network(model, max_detections=100, min_prob=0.5)
-    for file in all_files:
+    for filename in all_files:
         objects = luminoth.predict.predict_image(
             network, filename,
             only_classes=None,
@@ -449,6 +464,7 @@ def run_inference_on_images(viewer):
                            ignore_index=True)
 
     df = df.drop_duplicates()
+    csv_path = os.path.join(dirname, "bb_labels.csv")
     df.to_csv(csv_path, index=False)
     inferenced_list = [True] * len(all_files)
     viewer.layers["Image"].metadata["tflite_inferenced"] = inferenced_list

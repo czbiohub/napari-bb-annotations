@@ -1,4 +1,4 @@
-from qtpy.QtWidgets import QPushButton, QLabel
+from qtpy.QtWidgets import QPushButton
 from ._key_bindings import (
     save_bb_labels,
     load_bb_labels,
