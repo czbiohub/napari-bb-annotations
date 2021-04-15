@@ -1,6 +1,6 @@
 # You can use this file to create a conda environment for this pipeline:
 #   conda env create -f environment.yml
-name: bb-annotations-0.1.0dev
+name: bb-annotations-lumi-0.0.4dev
 channels:
   - conda-forge
   - defaults
@@ -40,7 +40,7 @@ dependencies:
   - pydantic>=1.8.1
   - tifffile>=2020.2.16
   - typing_extensions
+  - tensorflow==1.13.2
   - pip:
-    - tensorflow==1.13.2
     - git+git://github.com/czbiohub/luminoth-uv-imaging.git@14f00ab37c9094474f90bc0fcbe36bdc2dfa2936
     - git+git://github.com/napari/napari.git@c799d11049830ff0263df96cc1425770ae7f3def # master - Tested for only until April 13th commit of master
