@@ -110,6 +110,11 @@ def reader_function(path):
             glob.glob(os.path.join(path, "*" + format_of_files))))
 
     # stack arrays into single array
+    if format_of_files in ["tiff"]:
+        image = Image.open(all_files[0])
+        if image.n_frames > 1:
+            raise AssertionError("Multipage tiff not supported")
+            return
     shape = np.asarray(Image.open(all_files[0]).convert('RGB'), dtype=np.uint8).shape
     total_files = len(all_files)
     if len(shape) == 3:
