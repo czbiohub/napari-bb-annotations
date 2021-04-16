@@ -1,7 +1,7 @@
 set -e
 set -x
 
-RELEASE_VERSION=0.0.3
+RELEASE_VERSION=0.0.4ulc
 
 echo "Creating app bundle for napari-bb-annotations ${RELEASE_VERSION}"
 
@@ -19,7 +19,7 @@ RELEASE_ENV=${CONDA_ROOT}/envs/napari-bb-annotations-release
 conda env remove -y -q -n napari-bb-annotations-release
 
 echo "Creating new release environment"
-conda env create -n napari-bb-annotations-release -f environment.yml
+conda env create -n napari-bb-annotations-release -f environment.yml --force
 conda activate napari-bb-annotations-release
 ${RELEASE_ENV}/bin/python setup.py install
 conda install -y pyqt
