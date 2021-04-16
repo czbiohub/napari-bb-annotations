@@ -35,6 +35,7 @@ from setuptools import setup, find_packages
 import napari_bb_annotations
 
 requirements = ["appdirs >= 1.4.4",
+                "decorator",
                 "imageio-ffmpeg",
                 "imageio>=2.5.0"
                 "importlib-metadata>=1.5.0",
