@@ -23,8 +23,6 @@ import numpy as np
 import pandas as pd
 from PIL import Image
 from PIL import ImageDraw
-from skimage.io import imread
-from skimage.color import gray2rgb
 from skimage.filters import threshold_otsu
 import napari_bb_annotations.detect as detect
 import napari_bb_annotations.utils as utils
@@ -36,10 +34,6 @@ DEFAULT_CONFIDENCE = 0.4
 DEFAULT_FILTER_AREA = 22680
 DEFAULT_INFERENCE_COUNT = 1
 DEFAULT_IMAGE_FORMAT = ".jpg"
-
-
-def scale_to_uint8(image):
-    return ((image - image.min()) / (image.max() - image.min()) * 255).astype(np.uint8)
 
 
 def detect_images(
@@ -78,17 +72,8 @@ def detect_images(
         print('Note: The first inference is slow because it includes',
               'loading the model into Edge TPU memory.')
     for input_image in input_images:
-        numpy_image = imread(input_image)
-        if numpy_image.dtype == "uint16":
-            numpy_image = scale_to_uint8(numpy_image)
-            if len(numpy_image.shape) == 3:
-                if numpy_image.shape[2] == 1:
-                    numpy_image = gray2rgb(numpy_image)
-            elif len(numpy_image.shape) == 2:
-                numpy_image = gray2rgb(numpy_image)
-            image = Image.fromarray(numpy_image)
-        else:
-            image = Image.open(input_image)
+        image = Image.open(input_image).convert('RGB')
+        numpy_image = np.asarray(image, dtype=np.uint8)
         scale = detect.set_input(
             interpreter, image.size,
             lambda size: image.resize(size, Image.ANTIALIAS))

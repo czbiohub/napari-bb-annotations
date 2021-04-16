@@ -21,7 +21,6 @@ from napari.utils.notifications import (
     notification_manager,
     show_info,
 )
-from skimage.io import imread
 from skimage.filters import threshold_otsu
 import skimage.measure
 
@@ -458,6 +457,7 @@ def run_segmentation_on_images(viewer):
         show_info('Pressed button for running segmentation')
     # label image regions
     all_files = viewer.layers["Image"].metadata["all_files"]
+    stack = viewer.layers["Image"].data
     dirname = os.path.dirname(all_files[0])
     inference_metadata_path = os.path.join(
         dirname, "inference_metadata.pickle")
@@ -474,10 +474,14 @@ def run_segmentation_on_images(viewer):
                 notification_manager.notification_ready.connect(_append)
                 show_info('Already ran threshold prediction, click load')
             logger.info("Already ran threshold prediction, click load")
+    shape = stack.shape
     if set(already_inferenced) == {False}:
         df = pd.DataFrame(columns=LUMI_CSV_COLUMNS)
-        for file_path in all_files:
-            numpy_image = imread(file_path)
+        for index, file_path in enumerate(all_files):
+            if len(shape) == 4:
+                numpy_image = stack[index][:, :, 0]
+            elif len(shape) == 3:
+                numpy_image = stack[index]
             height, width = numpy_image.shape[:2]
             thresholded_image = np.zeros(
                 (numpy_image.shape[0], numpy_image.shape[1]), dtype=np.uint8)
