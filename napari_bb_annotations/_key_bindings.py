@@ -166,6 +166,10 @@ def create_label_menu(shapes_layer, image_layer):
             label_menu.value = new_label
         elif (new_label not in BOX_ANNOTATIONS and
               new_label not in label_menu.choices):
+            new_labels = image_layer.metadata["new_labels"]
+            new_labels.append(new_label)
+            new_labels = np.unique(new_labels).tolist()
+            image_layer.metadata["new_labels"] = new_labels
             label_menu.set_choice(new_label, new_label)
 
     shapes_layer.events.current_properties.connect(update_label_menu)
