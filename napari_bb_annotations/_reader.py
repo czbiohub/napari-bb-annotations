@@ -66,7 +66,7 @@ def convert_video(path):
         location, "frames_{}".format(filename_wo_format))
     create_dir_if_not_exists(output_frames_path)
     subprocess.check_call(
-        'ffmpeg -i "{}" -f image2 "{}/video-frame%05d.jpg"'.format(
+        'ffmpeg -i "{}" -f image2 "{}/video-frame%05d.png"'.format(
             path, output_frames_path), shell=True)
     return output_frames_path
 

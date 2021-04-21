@@ -1,3 +1,4 @@
+import csv
 import datetime
 import json
 import logging
@@ -166,6 +167,9 @@ def create_label_menu(shapes_layer, image_layer):
         elif (new_label in image_layer.metadata["new_labels"] and
               new_label not in BOX_ANNOTATIONS and
               new_label not in label_menu.choices):
+            new_labels = image_layer.metadata["new_labels"]
+            new_labels.append(new_label)
+            image_layer.metadata["new_labels"] = new_labels
             label_menu.set_choice(new_label, new_label)
 
     shapes_layer.events.current_properties.connect(update_label_menu)
@@ -185,11 +189,22 @@ def create_label_menu(shapes_layer, image_layer):
     return label_widget
 
 
-def update_summary_table(shapes_layer, image_layer):
+def update_summary_table(viewer):
+    shapes_layer = viewer.layers["Shapes"]
+    image_layer = viewer.layers["Image"]
+    logger.info("Pressed save bounding boxes, labels button")
+    with notification_manager:
+        # save all of the events that get emitted
+        store: List[Notification] = []   # noqa
+        _append = lambda e: store.append(e)  # lambda needed on py3.7  # noqa
+        notification_manager.notification_ready.connect(_append)
+        show_info('Pressed save bounding boxes, labels button')
     box_labels = shapes_layer.properties["box_label"].tolist()
     total_sum = len(box_labels)
-    index = BOX_ANNOTATIONS
     data = []
+    total_sum = len(box_labels)
+    new_labels = image_layer.metadata["new_labels"]
+    index = sorted([new_labels] + BOX_ANNOTATIONS)
     for label in index:
         count_label = box_labels.count(label)
         data.append([count_label, round((count_label * 100) / total_sum, 2)])
@@ -198,67 +213,8 @@ def update_summary_table(shapes_layer, image_layer):
         "index": tuple(index),
         "columns": ("c", "p"),
     }
+
     table_widget = Table(value=split_dict)
-    table_widget.tooltip = "Edit the label for selected bounding box, Click close button after completing"
-    label_property = "box_label"
-    label_menu = ComboBox(label='text label', choices=BOX_ANNOTATIONS)
-
-    def update_table_on_label_change(event):
-        """This is a callback function that updates the summary table when
-        the current properties of the Shapes layer change or when you are
-        moving to next image or at the end of stack
-        """
-        new_label = str(shapes_layer.current_properties[label_property][0])
-        if new_label != label_menu.value:
-            box_labels = shapes_layer.properties["box_label"].tolist()
-            if new_label not in BOX_ANNOTATIONS:
-                new_labels = image_layer.metadata["new_labels"]
-                new_labels.append(new_label)
-                image_layer.metadata["new_labels"] = new_labels
-                data = []
-                total_sum = len(box_labels)
-                index = sorted([new_label] + BOX_ANNOTATIONS)
-                for label in index:
-                    count_label = box_labels.count(label)
-                    data.append([count_label, round((count_label * 100) / total_sum, 2)])
-                split_dict = {
-                    "data": data,
-                    "index": tuple(index),
-                    "columns": ("c", "p"),
-                }
-            else:
-                index = sorted(np.unique(shapes_layer.properties['box_label']).tolist())
-                index = sorted(list(set(index + BOX_ANNOTATIONS)))
-                total_sum = len(box_labels)
-                data = []
-                for label in index:
-                    count_label = box_labels.count(label)
-                    data.append([count_label, round((count_label * 100) / total_sum, 2)])
-                split_dict = {
-                    "data": data,
-                    "index": tuple(index),
-                    "columns": ("c", "p"),
-                }
-            table_widget.value = split_dict
-
-    def update_table_on_coordinates_change(event):
-        box_labels = shapes_layer.properties[label_property].tolist()
-        index = sorted(np.unique(shapes_layer.properties['box_label']).tolist())
-        index = sorted(list(set(index + BOX_ANNOTATIONS)))
-        total_sum = len(box_labels)
-        data = []
-        for label in index:
-            count_label = box_labels.count(label)
-            data.append([count_label, round((count_label * 100) / total_sum, 2)])
-        split_dict = {
-            "data": data,
-            "index": tuple(index),
-            "columns": ("c", "p"),
-        }
-        table_widget.value = split_dict
-
-    shapes_layer.events.current_properties.connect(update_table_on_label_change)
-    shapes_layer.events.set_data.connect(update_table_on_coordinates_change)
     return table_widget
 
 
@@ -276,10 +232,68 @@ def save_bb_labels(viewer):
     stack = image.data
     bboxes = shape.data
     labels = shape.properties["box_label"].tolist()
-    save_overlay_path = metadata["save_overlay_path"]
     csv_path = os.path.join(
-        os.path.dirname(save_overlay_path), "bb_labels.csv")
-    df = pd.DataFrame(columns=LUMI_CSV_COLUMNS)
+        os.path.dirname(metadata["all_files"][0]), "bb_labels.csv")
+
+    z_indices = []
+    for bbox in bboxes:
+        z_index = np.unique((bbox[:, 0])).tolist()
+        assert len(z_index) == 1
+        z_indices.append(z_index[0])
+    z_indices = np.unique(z_indices).tolist()
+    height, width = stack[0].shape[:2]
+    for stack_index in z_indices:
+        # visualization image
+        file_path = metadata["all_files"][int(stack_index)]
+        bb_labels_rows = []        
+        for index, bbox in enumerate(bboxes):
+            z_index = np.unique((bbox[:, 0])).tolist()
+            assert len(z_index) == 1
+            if z_index[0] == stack_index:
+                if not check_bbox(get_bbox_obj_detection(bbox), width, height)[0]:
+                    label = labels[index]
+                    bb_labels_rows.append(
+                        [file_path, int(bbox[0]), int(bbox[2]), int(bbox[1]), int(bbox[3]), label, 0, 0])
+
+    with open(csv_path, "w") as csvfile:
+        # creating a csv writer object
+        csvwriter = csv.writer(csvfile, lineterminator="\n")
+
+        # writing the fields
+        csvwriter.writerow(LUMI_CSV_COLUMNS)
+
+        # writing the data rows
+        csvwriter.writerows(bb_labels_rows)
+    with notification_manager:
+        # save all of the events that get emitted
+        store: List[Notification] = []   # noqa
+        _append = lambda e: store.append(e)  # lambda needed on py3.7  # noqa
+        notification_manager.notification_ready.connect(_append)
+        show_info("csv path is {}".format(csv_path))
+    logger.info("csv path is {}".format(csv_path))
+    df.to_csv(csv_path)
+    data = viewer.layers["Image"].metadata["table_widget"].value
+    json_path = os.path.join(
+        os.path.dirname(save_overlay_path), "summary_table.json")
+    with open(json_path, 'w') as fp:
+        json.dump(data, fp)
+
+
+def save_overlaid(viewer):
+    logger.info("Pressed save annotations overlay button")
+    with notification_manager:
+        # save all of the events that get emitted
+        store: List[Notification] = []   # noqa
+        _append = lambda e: store.append(e)  # lambda needed on py3.7  # noqa
+        notification_manager.notification_ready.connect(_append)
+        show_info('Pressed save annotations overlay button')
+    shape = viewer.layers["Shapes"]
+    image = viewer.layers["Image"]
+    metadata = viewer.layers["Image"].metadata
+    stack = image.data
+    bboxes = shape.data
+    labels = shape.properties["box_label"].tolist()
+    save_overlay_path = metadata["save_overlay_path"]
     z_indices = []
     for bbox in bboxes:
         z_index = np.unique((bbox[:, 0])).tolist()
@@ -301,14 +315,6 @@ def save_bb_labels(viewer):
             if z_index[0] == stack_index:
                 _, bbox = check_bbox(get_bbox_obj_detection(bbox), width, height)
                 label = labels[index]
-                df = df.append(
-                    {'image_id': file_path,
-                     'xmin': int(bbox[0]),
-                     'ymin': int(bbox[1]),
-                     'xmax': int(bbox[2]),
-                     'ymax': int(bbox[3]),
-                     'label': label
-                     }, ignore_index=True)
                 labels_for_image.append(label)
                 bboxes_converted.append(bbox)
         if len(bboxes_converted) != 0:
@@ -323,20 +329,6 @@ def save_bb_labels(viewer):
                 "pred_{}".format(basename)
             )
             image_at_index.save(overlaid_save_name)
-    with notification_manager:
-        # save all of the events that get emitted
-        store: List[Notification] = []   # noqa
-        _append = lambda e: store.append(e)  # lambda needed on py3.7  # noqa
-        notification_manager.notification_ready.connect(_append)
-        show_info("csv path and overlaid images path is {}".format(csv_path, save_overlay_path))
-    logger.info("csv path is {}".format(csv_path))
-    df.to_csv(csv_path)
-    data = viewer.layers["Image"].metadata["table_widget"].value
-    json_path = os.path.join(
-        os.path.dirname(save_overlay_path), "summary_table.json")
-    with open(json_path, 'w') as fp:
-        json.dump(data, fp)
-
 
 def load_bb_labels(viewer):
     logger.info("Pressed load bounding box, labels button")
@@ -563,7 +555,6 @@ def edit_bb_labels(viewer):
         # https://doc.qt.io/Qt-5/qtablewidgetitem.html
         # whatever you want to do with the new value
         new_label = item.data(table_widget._widget._DATA_ROLE)
-        new_label = new_label.capitalize()
         current_properties = shapes_layer.current_properties
         current_properties['box_label'] = np.asarray([new_label], dtype='<U32')
         shapes_layer.current_properties = current_properties
