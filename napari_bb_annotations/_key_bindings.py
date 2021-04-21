@@ -352,19 +352,19 @@ def load_bb_labels(viewer):
             for row in csv_reader:
                 if line_count == 0:
                     line_count += 1
-            line_count += 1
-            x1 = row["xmin"]
-            x2 = row["xmax"]
-            y1 = row["ymin"]
-            y2 = row["ymax"]
-            label = row["label"]
-            image_id = row["image_id"]
-            z = all_files.index(image_id)
-            bbox_rect = np.array(
-                [[z, y1, x1], [z, y2, x1], [z, y2, x2], [z, y1, x2]]
-            )
-            bboxes.append(bbox_rect)
-            labels.append(label)
+                line_count += 1
+                x1 = row["xmin"]
+                x2 = row["xmax"]
+                y1 = row["ymin"]
+                y2 = row["ymax"]
+                label = row["label"]
+                image_id = row["image_id"]
+                z = all_files.index(image_id)
+                bbox_rect = np.array(
+                    [[z, y1, x1], [z, y2, x1], [z, y2, x2], [z, y1, x2]]
+                )
+                bboxes.append(bbox_rect)
+                labels.append(label)
         viewer.layers["Image"].metadata["loaded"] = [True] * len(all_files)
         shapes_layer.data = bboxes
         shapes_layer.properties["box_label"] = np.array(labels, dtype='<U32')
@@ -565,9 +565,9 @@ def edit_bb_labels(viewer):
         table_widget.visible = False
         # set the shapes layer mode back to rectangle
         shapes_layer.mode = 'add_rectangle'
-        new_labels = image_layer.metadata["new_labels"]
+        new_labels = viewer.layers["Image"].metadata["new_labels"]
         new_labels.append(new_label)
-        image_layer.metadata["new_labels"] = new_labels
+        viewer.layers["Image"].metadata["new_labels"] = new_labels
 
     table_widget.native.itemChanged.connect(on_item_changed)
 
