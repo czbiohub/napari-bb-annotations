@@ -164,8 +164,7 @@ def create_label_menu(shapes_layer, image_layer):
         new_label = str(shapes_layer.current_properties[label_property][0])
         if new_label != label_menu.value and new_label in BOX_ANNOTATIONS:
             label_menu.value = new_label
-        elif (new_label in image_layer.metadata["new_labels"] and
-              new_label not in BOX_ANNOTATIONS and
+        elif (new_label not in BOX_ANNOTATIONS and
               new_label not in label_menu.choices):
             label_menu.set_choice(new_label, new_label)
 
@@ -200,6 +199,7 @@ def update_summary_table(viewer):
     total_sum = len(box_labels)
     data = []
     new_labels = image_layer.metadata["new_labels"]
+    new_labels = np.unique(new_labels).tolist()
     index = sorted(new_labels + BOX_ANNOTATIONS)
     for label in index:
         count_label = box_labels.count(label)
@@ -343,8 +343,8 @@ def load_bb_labels(viewer):
     dirname = os.path.dirname(all_files[0])
     csv_path = os.path.join(dirname, "bb_labels.csv")
     shapes_layer = viewer.layers["Shapes"]
-    bboxes = shapes_layer.data
-    labels = shapes_layer.properties["box_label"].tolist()
+    bboxes = []
+    labels = []
     if os.path.exists(csv_path):
         with open(csv_path, mode='r') as csv_file:
             csv_reader = csv.DictReader(csv_file)
@@ -558,6 +558,10 @@ def edit_bb_labels(viewer):
         # https://doc.qt.io/Qt-5/qtablewidgetitem.html
         # whatever you want to do with the new value
         new_label = item.data(table_widget._widget._DATA_ROLE)
+        new_labels = viewer.layers["Image"].metadata["new_labels"]
+        new_labels.append(new_label)
+        new_labels = np.unique(new_labels).tolist()
+        viewer.layers["Image"].metadata["new_labels"] = new_labels
         current_properties = shapes_layer.current_properties
         current_properties['box_label'] = np.asarray([new_label], dtype='<U32')
         shapes_layer.current_properties = current_properties
@@ -565,9 +569,6 @@ def edit_bb_labels(viewer):
         table_widget.visible = False
         # set the shapes layer mode back to rectangle
         shapes_layer.mode = 'add_rectangle'
-        new_labels = viewer.layers["Image"].metadata["new_labels"]
-        new_labels.append(new_label)
-        viewer.layers["Image"].metadata["new_labels"] = new_labels
 
     table_widget.native.itemChanged.connect(on_item_changed)
 
