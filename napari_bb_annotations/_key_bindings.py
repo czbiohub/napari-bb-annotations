@@ -167,9 +167,6 @@ def create_label_menu(shapes_layer, image_layer):
         elif (new_label in image_layer.metadata["new_labels"] and
               new_label not in BOX_ANNOTATIONS and
               new_label not in label_menu.choices):
-            new_labels = image_layer.metadata["new_labels"]
-            new_labels.append(new_label)
-            image_layer.metadata["new_labels"] = new_labels
             label_menu.set_choice(new_label, new_label)
 
     shapes_layer.events.current_properties.connect(update_label_menu)
@@ -330,6 +327,7 @@ def save_overlaid(viewer):
             )
             image_at_index.save(overlaid_save_name)
 
+
 def load_bb_labels(viewer):
     logger.info("Pressed load bounding box, labels button")
     with notification_manager:
@@ -344,19 +342,23 @@ def load_bb_labels(viewer):
     all_files = viewer.layers["Image"].metadata["all_files"]
     dirname = os.path.dirname(all_files[0])
     csv_path = os.path.join(dirname, "bb_labels.csv")
+    shapes_layer = viewer.layers["Shapes"]
+    bboxes = shapes_layer.data
+    labels = shapes_layer.properties["box_label"].tolist()
     if os.path.exists(csv_path):
-        df = pd.read_csv(csv_path)
-        df = df.drop_duplicates()
-        shapes_layer = viewer.layers["Shapes"]
-        bboxes = shapes_layer.data
-        labels = shapes_layer.properties["box_label"].tolist()
-        for index, row in df.iterrows():
-            x1 = row.xmin
-            x2 = row.xmax
-            y1 = row.ymin
-            y2 = row.ymax
-            label = row.label
-            image_id = row.image_id
+        with open(csv_path, mode='r') as csv_file:
+            csv_reader = csv.DictReader(csv_file)
+            line_count = 0
+            for row in csv_reader:
+                if line_count == 0:
+                    line_count += 1
+            line_count += 1
+            x1 = row["xmin"]
+            x2 = row["xmax"]
+            y1 = row["ymin"]
+            y2 = row["ymax"]
+            label = row["label"]
+            image_id = row["image_id"]
             z = all_files.index(image_id)
             bbox_rect = np.array(
                 [[z, y1, x1], [z, y2, x1], [z, y2, x2], [z, y1, x2]]
@@ -434,6 +436,7 @@ def run_inference_on_images(viewer):
             DEFAULT_FILTER_AREA, True)
         inferenced_list = [True] * len(all_files)
         viewer.layers["Image"].metadata["tflite_inferenced"] = inferenced_list
+        viewer.layers["Image"].metadata["loaded"] = [False] * len(all_files)
         metadata = {"tflite_inferenced": inferenced_list}
         pickle_save(inference_metadata_path, metadata)
         load_bb_labels(viewer)
@@ -467,8 +470,8 @@ def run_segmentation_on_images(viewer):
                 show_info('Already ran threshold prediction, click load')
             logger.info("Already ran threshold prediction, click load")
     shape = stack.shape
+    bb_labels_rows = []
     if set(already_inferenced) == {False}:
-        df = pd.DataFrame(columns=LUMI_CSV_COLUMNS)
         for index, file_path in enumerate(all_files):
             if len(shape) == 4:
                 numpy_image = stack[index][:, :, 0]
@@ -486,19 +489,21 @@ def run_segmentation_on_images(viewer):
                 if region.area >= 1000 and region.area <= 8000:
                     ymin, xmin, ymax, xmax = region.bbox
                     if not check_bbox([xmin, ymin, xmax, ymax], width, height)[0]:
-                        df = df.append(
-                            {'image_id': file_path,
-                             'xmin': int(xmin),
-                             'ymin': int(ymin),
-                             'xmax': int(xmax),
-                             'ymax': int(ymax),
-                             'label': "healthy",
-                             }, ignore_index=True)
+                        bb_labels_rows.append([file_path, xmin, xmax, ymin, ymax, "healthy", 0, 0])
         inferenced_list = [True] * len(all_files)
         viewer.layers["Image"].metadata["threshold_inferenced"] = inferenced_list
         metadata = {"threshold_inferenced": inferenced_list}
+        viewer.layers["Image"].metadata["loaded"] = [False] * len(all_files)
         pickle_save(inference_metadata_path, metadata)
-        df.to_csv(os.path.join(dirname, "bb_labels.csv"), index=False)
+        with open(os.path.join(dirname, "bb_labels.csv"), "w") as csvfile:
+            # creating a csv writer object
+            csvwriter = csv.writer(csvfile, lineterminator="\n")
+
+            # writing the fields
+            csvwriter.writerow(LUMI_CSV_COLUMNS)
+
+            # writing the data rows
+            csvwriter.writerows(bb_labels_rows)
         load_bb_labels(viewer)
 
 
@@ -560,6 +565,9 @@ def edit_bb_labels(viewer):
         table_widget.visible = False
         # set the shapes layer mode back to rectangle
         shapes_layer.mode = 'add_rectangle'
+        new_labels = image_layer.metadata["new_labels"]
+        new_labels.append(new_label)
+        image_layer.metadata["new_labels"] = new_labels
 
     table_widget.native.itemChanged.connect(on_item_changed)
 
@@ -574,7 +582,6 @@ def load_bb_labels_for_image(viewer, csv_path):
         filename = all_files[index_of_image]
         dirname = os.path.dirname(all_files[0])
         df = pd.read_csv(csv_path, index_col=False)
-        df = df.drop_duplicates()
         # Filter out the df for all the bounding boxes in one image
         tmp_df = df[df.image_id == filename]
         shapes_layer = viewer.layers["Shapes"]

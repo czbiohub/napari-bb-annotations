@@ -49,9 +49,10 @@ def connect_to_viewer(viewer):
     edit_bb_label_btn.clicked.connect(lambda: edit_bb_labels(viewer))
     edit_bb_label_btn.setToolTip("Edit label for 1 selected bounding box, use select tool that looks like a transparent arrow on left")
 
-    summary_annotations_btn = QPushButton("Edit label for bounding box")
+    summary_annotations_btn = QPushButton("Update summary annotations table")
     summary_annotations_btn.clicked.connect(lambda: update_summary_table(viewer))
     summary_annotations_btn.setToolTip("Update summary annotations table")
+
     viewer.window.add_dock_widget(
         [run_segmentation_btn,
          run_tflite_inference_btn,
@@ -59,7 +60,8 @@ def connect_to_viewer(viewer):
          load_gui_btn,
          save_gui_btn,
          save_overlaid_btn,
-         edit_bb_label_btn],
+         edit_bb_label_btn,
+         summary_annotations_btn],
         area="right",
         allowed_areas=["right", "left"],
     )

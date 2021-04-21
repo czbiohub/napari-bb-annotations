@@ -18,9 +18,9 @@ import argparse
 import importlib
 import time
 import glob
+import csv
 import os
 import numpy as np
-import pandas as pd
 from PIL import Image
 from PIL import ImageDraw
 from skimage.filters import threshold_otsu
@@ -40,7 +40,6 @@ def detect_images(
         model, use_tpu, input_path, format_of_files,
         labels, threshold, output, count, overlaid,
         area_filter, filter_background_bboxes):
-    df = pd.DataFrame(columns=LUMI_CSV_COLUMNS)
     output = os.path.abspath(output)
     utils.create_dir_if_not_exists(output)
     labels = utils.load_labels(labels) if labels else {}
@@ -71,6 +70,7 @@ def detect_images(
     if use_tpu:
         print('Note: The first inference is slow because it includes',
               'loading the model into Edge TPU memory.')
+    bb_labels_rows = []
     for input_image in input_images:
         image = Image.open(input_image).convert('RGB')
         numpy_image = np.asarray(image, dtype=np.uint8)
@@ -102,25 +102,20 @@ def detect_images(
                 if filter_background_bboxes:
                     if utils.check_if_bbox_not_background(
                             bbox, thresholded_image):
-                        df = df.append(
-                            {'image_id': input_image,
-                             'xmin': xmin,
-                             'xmax': xmax,
-                             'ymin': ymin,
-                             'ymax': ymax,
-                             'label': labels.get(obj.id, obj.id),
-                             'prob': obj.score}, ignore_index=True)
+                        bb_labels_rows.append([input_image, xmin, xmax, ymin, ymax, labels.get(obj.id, obj.id), obj.score, 0])
                         filtered_objs.append(obj)
                 else:
-                    df = df.append(
-                        {'image_id': input_image,
-                         'xmin': xmin,
-                         'xmax': xmax,
-                         'ymin': ymin,
-                         'ymax': ymax,
-                         'label': labels.get(obj.id, obj.id),
-                         'prob': obj.score}, ignore_index=True)
+                    bb_labels_rows.append([input_image, xmin, xmax, ymin, ymax, labels.get(obj.id, obj.id), obj.score, 0])
                     filtered_objs.append(obj)
+        with open(os.path.join(output, "bb_labels.csv"), "w") as csvfile:
+            # creating a csv writer object
+            csvwriter = csv.writer(csvfile, lineterminator="\n")
+
+            # writing the fields
+            csvwriter.writerow(LUMI_CSV_COLUMNS)
+
+            # writing the data rows
+            csvwriter.writerows(bb_labels_rows)
         if overlaid:
             image = image.convert('RGB')
             utils.draw_objects(ImageDraw.Draw(image), filtered_objs, labels)
@@ -128,7 +123,6 @@ def detect_images(
                 os.path.join(
                     output,
                     os.path.basename(input_image)))
-    df.to_csv(os.path.join(output, "bb_labels.csv"))
 
 
 def main():
