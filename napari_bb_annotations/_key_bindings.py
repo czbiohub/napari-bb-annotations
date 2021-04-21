@@ -192,13 +192,13 @@ def create_label_menu(shapes_layer, image_layer):
 def update_summary_table(viewer):
     shapes_layer = viewer.layers["Shapes"]
     image_layer = viewer.layers["Image"]
-    logger.info("Pressed save bounding boxes, labels button")
+    logger.info("Updating summary table")
     with notification_manager:
         # save all of the events that get emitted
         store: List[Notification] = []   # noqa
         _append = lambda e: store.append(e)  # lambda needed on py3.7  # noqa
         notification_manager.notification_ready.connect(_append)
-        show_info('Pressed save bounding boxes, labels button')
+        show_info('Updating summary table')
     box_labels = shapes_layer.properties["box_label"].tolist()
     total_sum = len(box_labels)
     data = []
@@ -228,11 +228,12 @@ def save_bb_labels(viewer):
     shape = viewer.layers["Shapes"]
     image = viewer.layers["Image"]
     metadata = viewer.layers["Image"].metadata
+    save_overlay_path = metadata["save_overlay_path"]
     stack = image.data
     bboxes = shape.data
     labels = shape.properties["box_label"].tolist()
     csv_path = os.path.join(
-        os.path.dirname(metadata["all_files"][0]), "bb_labels.csv")
+        os.path.dirname(save_overlay_path), "bb_labels.csv")
 
     z_indices = []
     for bbox in bboxes:
