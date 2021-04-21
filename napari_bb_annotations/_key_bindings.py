@@ -202,9 +202,8 @@ def update_summary_table(viewer):
     box_labels = shapes_layer.properties["box_label"].tolist()
     total_sum = len(box_labels)
     data = []
-    total_sum = len(box_labels)
     new_labels = image_layer.metadata["new_labels"]
-    index = sorted([new_labels] + BOX_ANNOTATIONS)
+    index = sorted(new_labels + BOX_ANNOTATIONS)
     for label in index:
         count_label = box_labels.count(label)
         data.append([count_label, round((count_label * 100) / total_sum, 2)])
@@ -242,15 +241,16 @@ def save_bb_labels(viewer):
         z_indices.append(z_index[0])
     z_indices = np.unique(z_indices).tolist()
     height, width = stack[0].shape[:2]
+    bb_labels_rows = []
     for stack_index in z_indices:
         # visualization image
         file_path = metadata["all_files"][int(stack_index)]
-        bb_labels_rows = []        
         for index, bbox in enumerate(bboxes):
             z_index = np.unique((bbox[:, 0])).tolist()
             assert len(z_index) == 1
             if z_index[0] == stack_index:
-                if not check_bbox(get_bbox_obj_detection(bbox), width, height)[0]:
+                bbox = get_bbox_obj_detection(bbox)
+                if not check_bbox(bbox, width, height)[0]:
                     label = labels[index]
                     bb_labels_rows.append(
                         [file_path, int(bbox[0]), int(bbox[2]), int(bbox[1]), int(bbox[3]), label, 0, 0])
@@ -271,7 +271,6 @@ def save_bb_labels(viewer):
         notification_manager.notification_ready.connect(_append)
         show_info("csv path is {}".format(csv_path))
     logger.info("csv path is {}".format(csv_path))
-    df.to_csv(csv_path)
     data = viewer.layers["Image"].metadata["table_widget"].value
     json_path = os.path.join(
         os.path.dirname(save_overlay_path), "summary_table.json")
@@ -513,9 +512,7 @@ def update_layers(viewer):
     label_widget = create_label_menu(shapes_layer, image_layer)
     # add the label selection gui to the viewer as a dock widget
     viewer.window.add_dock_widget(label_widget, area='right')
-    table_widget = update_summary_table(
-        viewer.layers["Shapes"],
-        viewer.layers["Image"])
+    table_widget = update_summary_table(viewer)
     table_widget.min_width = 300
     table_widget.min_height = 400
     table_widget.max_width = 300
