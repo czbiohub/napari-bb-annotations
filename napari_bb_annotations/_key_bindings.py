@@ -213,7 +213,11 @@ def update_summary_table(viewer):
         "columns": ("c", "p"),
     }
 
-    table_widget = Table(value=split_dict)
+    table_widget = viewer.layers["Image"].metadata["table_widget"]
+    if table_widget != "":
+        table_widget.value = split_dict
+    else:
+        table_widget = Table(value=split_dict)
     return table_widget
 
 

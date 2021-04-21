@@ -139,6 +139,7 @@ def reader_function(path):
         "lumi_inferenced": [False] * num_files,
         "model": MODEL,
         "tflite_model": TFLITE_MODEL,
+        "table_wdiget": "",
         "edgetpu": EDGETPU},
         "name": "Image"}
 
