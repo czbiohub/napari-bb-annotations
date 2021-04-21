@@ -202,9 +202,8 @@ def update_summary_table(viewer):
     box_labels = shapes_layer.properties["box_label"].tolist()
     total_sum = len(box_labels)
     data = []
-    new_labels = image_layer.metadata["new_labels"]
-    new_labels = np.unique(new_labels).tolist()
-    index = sorted(new_labels + BOX_ANNOTATIONS)
+    new_labels = np.unique(box_labels).tolist()
+    index = sorted(np.unique(new_labels + BOX_ANNOTATIONS).tolist())
     for label in index:
         count_label = box_labels.count(label)
         data.append([count_label, round((count_label * 100) / total_sum, 2)])
