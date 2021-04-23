@@ -13,7 +13,7 @@ import pandas as pd
 from magicgui.widgets import ComboBox, Container, Table
 from PIL import Image, ImageDraw
 from napari_bb_annotations.constants_lumi import (
-    BOX_ANNOTATIONS, LUMI_CSV_COLUMNS)
+    BOX_ANNOTATIONS, LUMI_CSV_COLUMNS, EDGE_COLOR_CYCLE, CYCLE)
 from napari_bb_annotations.run_inference import (
     detect_images, DEFAULT_INFERENCE_COUNT,
     DEFAULT_FILTER_AREA)
@@ -183,6 +183,9 @@ def create_label_menu(shapes_layer, image_layer):
         current_properties[label_property] = np.asarray([selected_label], dtype='<U32')
         shapes_layer.current_properties = current_properties
         shapes_layer.text.refresh_text(shapes_layer.properties)
+        shapes_layer.edge_color_cycle = EDGE_COLOR_CYCLE
+        shapes_layer.edge_color_mode = CYCLE
+        logger.info("Color is refreshed")
 
     label_menu.changed.connect(label_changed)
 
@@ -376,6 +379,9 @@ def load_bb_labels(viewer):
         shapes_layer.data = bboxes
         shapes_layer.properties["box_label"] = np.array(labels, dtype='<U32')
         shapes_layer.text.refresh_text(shapes_layer.properties)
+        shapes_layer.edge_color_cycle = EDGE_COLOR_CYCLE
+        shapes_layer.edge_color_mode = CYCLE
+        logger.info("Color is refreshed")
     table_widget = update_layers(viewer)
     box_labels = shapes_layer.properties['box_label'].tolist()
     index = sorted(np.unique(shapes_layer.properties['box_label']).tolist())
@@ -611,6 +617,9 @@ def load_bb_labels_for_image(viewer, csv_path):
         shapes_layer.data = bboxes
         shapes_layer.properties["box_label"] = np.array(labels, dtype='<U32')
         shapes_layer.text.refresh_text(shapes_layer.properties)
+        shapes_layer.edge_color_cycle = EDGE_COLOR_CYCLE
+        shapes_layer.edge_color_mode = CYCLE
+        logger.info("Color is refreshed")
         viewer.layers["Image"].metadata["loaded"][index_of_image] = True
     table_widget = update_layers(viewer)
     box_labels = shapes_layer.properties['box_label'].tolist()
