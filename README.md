@@ -6,7 +6,9 @@
 [![tests](https://github.com/pranathivemuri/napari-bb-annotations/workflows/tests/badge.svg)](https://github.com/pranathivemuri/napari-bb-annotations/actions)
 [![codecov](https://codecov.io/gh/pranathivemuri/napari-bb-annotations/branch/master/graph/badge.svg)](https://codecov.io/gh/pranathivemuri/napari-bb-annotations)
 
-Bounding box annotations
+Bounding box annotations.
+Go to branch pranathi-lumi if you want to use this tool for annotating the 6 classes - (3 known mosquito species, debris, insect, unknown mosquitoes)
+Go to branch pranathi-tflite if you want to use this tool for annotating the 4 classes - (3 malarial parasite stages ring, schizont, troph in RBC's and healthy cells as the 4th class)
 
 ----------------------------------
 
